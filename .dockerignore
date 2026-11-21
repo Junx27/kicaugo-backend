@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+*.exe
+*.test
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test coverage
+coverage.*
+*.coverprofile
+
+# Documentation
+docs/
+README.md
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+Dockerfile.*
+*.dockerfile
+
+# Go
+go.work
+go.work.sum
+
+# Migration tool (if any)
+migrate/
+*.migrate

@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kicaugo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kicaugo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kicaugo}
+      POSTGRES_DB: ${POSTGRES_DB:-kicaugo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kicaugo} -d ${POSTGRES_DB:-kicaugo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - kicaugo-net
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kicaugo-api
+    environment:
+      PORT: ${PORT:-8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-kicaugo}:${POSTGRES_PASSWORD:-kicaugo}@postgres:5432/${POSTGRES_DB:-kicaugo}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-changeme-in-production}
+      DOCS_ENABLED: ${DOCS_ENABLED:-true}
+      DOCS_USER: ${DOCS_USER:-admin}
+      DOCS_PASS: ${DOCS_PASS:-changeme}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kicaugo-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
+
+networks:
+  kicaugo-net:
+    driver: bridge
