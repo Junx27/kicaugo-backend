@@ -1,7 +1,7 @@
 # KicauGo Backend
 
 Backend pilot untuk integrasi Flutter `rumahkicau.mobile`. Tahap ini hanya mencakup
-autentikasi dan Beranda; kontraknya ada di `docs/openapi.yaml`.
+autentikasi; kontrak OpenAPI dihasilkan Huma di `/openapi.json`.
 
 ## Konfigurasi
 
@@ -14,12 +14,33 @@ autentikasi dan Beranda; kontraknya ada di `docs/openapi.yaml`.
 ## Menjalankan
 
 ```bash
-psql "$DATABASE_URL" -f migrations/0001_init.sql
-psql "$DATABASE_URL" -f migrations/0002_seed.sql
 go run ./cmd/api
 ```
 
-Akun demo hasil seed: `test@gmail.com` / `test123@`.
+Migrasi, index, dan seeder dijalankan otomatis saat startup dari
+`internal/database/migrations`, `internal/database/indexes`, dan
+`internal/database/seeders`. Seeder bersifat idempotent sehingga aman dijalankan
+berulang kali.
+
+Akun demo: `test@gmail.com` / `test123@`.
+
+## Struktur
+
+```
+cmd/api/                  # entrypoint + wiring config, database, service
+cmd/server/               # konfigurasi HTTP server, router, middleware
+internal/config/          # konfigurasi environment
+internal/database/        # koneksi, migrations, indexes, seeders
+internal/entities/        # model domain (User, AuthResult, BirdCategory)
+internal/features/auth/   # fitur autentikasi
+internal/features/birdcategory/ # fitur kategori burung (GET)
+internal/middlewares/     # middleware HTTP (autentikasi JWT)
+internal/utils/errors/    # error domain dan format error HTTP
+internal/utils/http/      # helper registrasi route dan error HTTP
+internal/utils/jwt/       # penerbitan dan validasi token JWT
+internal/utils/request/   # tipe input request
+internal/utils/response/  # format dan tipe response API
+```
 
 ## Flutter
 
