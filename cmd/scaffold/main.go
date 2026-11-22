@@ -610,6 +610,8 @@ type {{.DomainPascal}}DeleteOutput struct {
 	}
 	return apphttp.InternalServerError("An error occurred. Please try again.")
 }`
+		// newMap tidak melewati insertBeforeMarker, jadi placeholder harus dirender manual.
+		newMap = strings.ReplaceAll(newMap, "{{.DomainPascal}}", domainPascal)
 		if strings.Contains(c, oldMap) {
 			c = strings.Replace(c, oldMap, newMap, 1)
 		}
