@@ -24,8 +24,8 @@ FROM gcr.io/distroless/static-debian12:nonroot
 # Copy binary from builder
 COPY --from=builder /app/bin/kicaugo /kicaugo
 
-# Copy migrations for runtime execution (from internal/migrations where embed.go reads them)
-COPY --from=builder /app/internal/migrations /migrations
+# Copy migrations for runtime execution (from internal/database/migrations where embed.go reads them)
+COPY --from=builder /app/internal/database/migrations /migrations
 
 # Non-root user (UID 65532 = nonroot in distroless)
 USER 65532:65532
