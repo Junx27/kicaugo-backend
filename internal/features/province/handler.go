@@ -6,8 +6,10 @@ import (
 	"net/http"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
+	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
@@ -20,7 +22,7 @@ func toData(c entities.Province) response.ProvinceData {
 }
 
 // RegisterRoutes mendaftarkan route province ke Huma API.
-func RegisterRoutes(api apphttp.API, service Service) {
+func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 	// GET /api/v1/provinces
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "listProvinces",
@@ -28,6 +30,12 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Path:    "/api/v1/provinces",
 		Summary: "List Provinces",
 		Tags:    []string{"province"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+		},
 	}, func(ctx context.Context, input *struct{}) (*response.ProvinceListOutput, error) {
 		items, err := service.List(ctx)
 		if err != nil {

@@ -43,7 +43,3 @@ func TestRepositoryList(t *testing.T) {
 		}
 	})
 }
-
-func (m *mockRepository) Delete(ctx context.Context, id int64) error {
-	return nil
-}

@@ -6,8 +6,10 @@ import (
 	"net/http"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
+	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
@@ -16,7 +18,7 @@ func toData(c entities.BirdCategory) response.BirdCategoryData {
 }
 
 // RegisterRoutes mendaftarkan route bird-category ke Huma API.
-func RegisterRoutes(api apphttp.API, service Service) {
+func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 	// GET /api/v1/bird-categories
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "listBirdCategories",
@@ -24,6 +26,12 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Path:    "/api/v1/bird-categories",
 		Summary: "List Bird Categories",
 		Tags:    []string{"bird-categories"},
+		Security: []map[string][]string{
+			{"bearerAuth": {}},
+		},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+		},
 	}, func(ctx context.Context, input *struct{}) (*response.BirdCategoryListOutput, error) {
 		cats, err := service.List(ctx)
 		if err != nil {
@@ -36,24 +44,6 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		resp := &response.BirdCategoryListOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "Bird categories loaded", data)
-		return resp, nil
-	})
-
-	// DELETE /api/v1/bird-categories/{id}
-	apphttp.Register(api, apphttp.Operation{
-		ID:      "deleteBirdCategory",
-		Method:  http.MethodDelete,
-		Path:    "/api/v1/bird-categories/{id}",
-		Summary: "Delete Bird Category",
-		Tags:    []string{"bird-categories"},
-	}, func(ctx context.Context, input *struct {
-		ID int64 `path:"id"`
-	}) (*response.BirdCategoryDeleteOutput, error) {
-		if err := service.Delete(ctx, input.ID); err != nil {
-			return nil, mapServiceError(err)
-		}
-		resp := &response.BirdCategoryDeleteOutput{}
-		resp.Status = http.StatusNoContent
 		return resp, nil
 	})
 

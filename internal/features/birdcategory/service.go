@@ -9,7 +9,6 @@ import (
 // Service adalah kontrak service kategori burung.
 type Service interface {
 	List(ctx context.Context) ([]entities.BirdCategory, error)
-	Delete(ctx context.Context, id int64) error
 
 	// scaffold:service-interface
 }
@@ -27,11 +26,6 @@ func NewService(repo Repository) Service {
 // List mengambil semua kategori burung.
 func (s *service) List(ctx context.Context) ([]entities.BirdCategory, error) {
 	return s.repo.List(ctx)
-}
-
-// Delete menghapus birdcategory.
-func (s *service) Delete(ctx context.Context, id int64) error {
-	return s.repo.Delete(ctx, id)
 }
 
 // scaffold:service-methods

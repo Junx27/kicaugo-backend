@@ -33,7 +33,3 @@ func TestServiceList(t *testing.T) {
 		}
 	})
 }
-
-func (f *fakeRepository) Delete(ctx context.Context, id int64) error {
-	return nil
-}

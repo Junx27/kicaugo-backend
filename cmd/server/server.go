@@ -48,8 +48,8 @@ func Run(ctx context.Context, deps Dependencies) error {
 	router := newRouter(deps.Config)
 	api := humachi.New(router, newHumaConfig(deps.Config))
 	auth.RegisterRoutes(api, deps.Auth, deps.Tokens)
-	birdcategory.RegisterRoutes(api, deps.BirdCategories)
-	province.RegisterRoutes(api, deps.Province)
+	birdcategory.RegisterRoutes(api, deps.BirdCategories, deps.Tokens)
+	province.RegisterRoutes(api, deps.Province, deps.Tokens)
 	// scaffold:routes
 	router.Get("/health", healthHandler)
 
