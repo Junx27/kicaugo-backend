@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
@@ -32,12 +33,30 @@ func firstName(fullName string) string {
 
 // toData memilih field ringkas untuk response home profile.
 func toData(view View) response.HomeProfileData {
-	return response.HomeProfileData{
+	data := response.HomeProfileData{
 		Name:      firstName(view.Profile.Profile.FullName),
 		Avatar:    view.Profile.Profile.AvatarURL,
 		Message:   view.Greeting,
 		LiveCount: view.OngoingEventsCount,
 	}
+	if view.ActiveStreaming != nil {
+		streaming := toActiveStreamingData(*view.ActiveStreaming)
+		data.ActiveStreaming = &streaming
+	}
+	return data
+}
+
+func toActiveStreamingData(s entities.ActiveEventStreaming) response.HomeActiveStreamingData {
+	data := response.HomeActiveStreamingData{
+		ID: s.ID, EventID: s.EventID, EventTitle: s.EventTitle, EventSlug: s.EventSlug,
+		Venue: s.Venue, City: s.City, LinkStream: s.LinkStream,
+		StartTime: s.StartTime.Format(time.RFC3339), TotalViews: s.TotalViews, Juara: s.Juara,
+	}
+	if s.EndTime != nil {
+		v := s.EndTime.Format(time.RFC3339)
+		data.EndTime = &v
+	}
+	return data
 }
 
 func toFeaturedData(data Featured) response.HomeFeaturedData {

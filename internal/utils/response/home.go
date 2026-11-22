@@ -1,11 +1,29 @@
 package response
 
+import "encoding/json"
+
+// HomeActiveStreamingData adalah ringkasan streaming aktif pada halaman home.
+type HomeActiveStreamingData struct {
+	ID         int64           `json:"id"`
+	EventID    int64           `json:"event_id"`
+	EventTitle string          `json:"event_title"`
+	EventSlug  string          `json:"event_slug"`
+	Venue      string          `json:"venue"`
+	City       string          `json:"city"`
+	LinkStream string          `json:"link_stream"`
+	StartTime  string          `json:"start_time"`
+	EndTime    *string         `json:"end_time"`
+	TotalViews int64           `json:"total_views"`
+	Juara      json.RawMessage `json:"juara"`
+}
+
 // HomeProfileData adalah ringkasan sederhana profil untuk halaman home.
 type HomeProfileData struct {
-	Name      string  `json:"name"`
-	Avatar    *string `json:"avatar"`
-	Message   string  `json:"message"`
-	LiveCount int     `json:"live_count"`
+	Name            string                   `json:"name"`
+	Avatar          *string                  `json:"avatar"`
+	Message         string                   `json:"message"`
+	LiveCount       int                      `json:"live_count"`
+	ActiveStreaming *HomeActiveStreamingData `json:"active_streaming"`
 }
 
 // HomeOutput adalah output GET /api/v1/home/profile.

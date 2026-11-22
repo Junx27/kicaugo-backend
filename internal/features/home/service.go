@@ -26,6 +26,7 @@ type ProfileReader interface {
 type EventReader interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error)
 	CountOngoing(ctx context.Context) (int, error)
+	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
 
 // BirdCategoryReader adalah bagian birdcategory.Service yang dipakai home.
@@ -39,6 +40,7 @@ type View struct {
 	Nearby             event.NearbyResult
 	Greeting           string
 	OngoingEventsCount int
+	ActiveStreaming    *entities.ActiveEventStreaming
 }
 
 // Featured adalah data demo featured contest Beranda.
@@ -141,11 +143,16 @@ func (s *service) Get(ctx context.Context, identifier string, opts Options) (Vie
 	if err != nil {
 		return View{}, err
 	}
+	activeStreaming, err := s.events.GetActiveStreaming(ctx)
+	if err != nil {
+		return View{}, err
+	}
 	return View{
 		Profile:            view,
 		Nearby:             nearby,
 		Greeting:           greeting(s.now()),
 		OngoingEventsCount: count,
+		ActiveStreaming:    activeStreaming,
 	}, nil
 }
 

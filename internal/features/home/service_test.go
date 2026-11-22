@@ -23,12 +23,14 @@ func (f *fakeProfileReader) Get(ctx context.Context, identifier string) (profile
 }
 
 type fakeEventReader struct {
-	result     event.NearbyResult
-	err        error
-	count      int
-	countErr   error
-	identifier string
-	opts       Options
+	result          event.NearbyResult
+	err             error
+	count           int
+	countErr        error
+	activeStreaming *entities.ActiveEventStreaming
+	activeErr       error
+	identifier      string
+	opts            Options
 }
 
 func (f *fakeEventReader) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error) {
@@ -39,6 +41,10 @@ func (f *fakeEventReader) ListNearby(ctx context.Context, identifier string, rad
 
 func (f *fakeEventReader) CountOngoing(ctx context.Context) (int, error) {
 	return f.count, f.countErr
+}
+
+func (f *fakeEventReader) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
+	return f.activeStreaming, f.activeErr
 }
 
 type fakeBirdCategoryReader struct {
@@ -58,8 +64,9 @@ func TestServiceGet(t *testing.T) {
 	t.Run("berhasil menggabungkan profil dan event", func(t *testing.T) {
 		view := profile.ProfileView{Profile: entities.UserProfile{FullName: "Kicau Mania"}}
 		nearby := event.NearbyResult{RadiusKM: 30}
+		active := &entities.ActiveEventStreaming{ID: 1, EventID: 68, EventTitle: "Lomba", LinkStream: "https://x"}
 		profiles := &fakeProfileReader{view: view}
-		events := &fakeEventReader{result: nearby, count: 4}
+		events := &fakeEventReader{result: nearby, count: 4, activeStreaming: active}
 		svc := NewServiceWithClock(profiles, events, &fakeBirdCategoryReader{}, fixedClock())
 
 		got, err := svc.Get(context.Background(), "user@example.com", Options{
@@ -69,7 +76,7 @@ func TestServiceGet(t *testing.T) {
 			t.Fatalf("Get() error = %v", err)
 		}
 		if got.Profile.Profile.FullName != "Kicau Mania" || got.Nearby.RadiusKM != 30 ||
-			got.Greeting != greetingAfternoon || got.OngoingEventsCount != 4 {
+			got.Greeting != greetingAfternoon || got.OngoingEventsCount != 4 || got.ActiveStreaming == nil || got.ActiveStreaming.EventID != 68 {
 			t.Errorf("Get() = %+v", got)
 		}
 		if profiles.identifier != "user@example.com" || events.identifier != "user@example.com" {
@@ -100,6 +107,13 @@ func TestServiceGet(t *testing.T) {
 
 	t.Run("gagal menghitung event berlangsung", func(t *testing.T) {
 		svc := NewService(&fakeProfileReader{}, &fakeEventReader{countErr: errors.New("db down")}, &fakeBirdCategoryReader{})
+		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
+			t.Error("Get() ingin error")
+		}
+	})
+
+	t.Run("gagal membaca streaming aktif", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{activeErr: errors.New("db down")}, &fakeBirdCategoryReader{})
 		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
 			t.Error("Get() ingin error")
 		}

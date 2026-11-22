@@ -61,6 +61,7 @@ func sampleView() View {
 	avatar := "https://cdn.example.com/avatar.png"
 	latitude, longitude := -6.2, 106.8
 	start := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+	streamStart := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
 	return View{
 		Profile: profile.ProfileView{
 			Profile: entities.UserProfile{
@@ -89,6 +90,10 @@ func sampleView() View {
 		},
 		Greeting:           greetingNoon,
 		OngoingEventsCount: 3,
+		ActiveStreaming: &entities.ActiveEventStreaming{
+			ID: 9, EventID: 68, EventTitle: "Lomba Kicau", EventSlug: "lomba-kicau", Venue: "GOR", City: "Sleman",
+			LinkStream: "https://youtube.com/live/abc", StartTime: streamStart, TotalViews: 12, Juara: []byte(`{"rank1":"A"}`),
+		},
 	}
 }
 
@@ -106,10 +111,16 @@ func TestGetHomeProfileHandler(t *testing.T) {
 			Status  int    `json:"status"`
 			Message string `json:"message"`
 			Data    struct {
-				Name      string  `json:"name"`
-				Avatar    *string `json:"avatar"`
-				Message   string  `json:"message"`
-				LiveCount int     `json:"live_count"`
+				Name            string  `json:"name"`
+				Avatar          *string `json:"avatar"`
+				Message         string  `json:"message"`
+				LiveCount       int     `json:"live_count"`
+				ActiveStreaming *struct {
+					ID         int64  `json:"id"`
+					EventID    int64  `json:"event_id"`
+					EventTitle string `json:"event_title"`
+					LinkStream string `json:"link_stream"`
+				} `json:"active_streaming"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
@@ -123,6 +134,9 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		}
 		if body.Data.Message != greetingNoon || body.Data.LiveCount != 3 {
 			t.Errorf("message/live_count = %q/%d", body.Data.Message, body.Data.LiveCount)
+		}
+		if body.Data.ActiveStreaming == nil || body.Data.ActiveStreaming.EventID != 68 || body.Data.ActiveStreaming.LinkStream == "" {
+			t.Fatalf("active_streaming=%+v", body.Data.ActiveStreaming)
 		}
 		if svc.identifier != testutil.TestIdentifier || svc.opts != (Options{RadiusKM: 25, CategoryID: 2, Limit: 3}) {
 			t.Errorf("identifier = %q, opts = %+v", svc.identifier, svc.opts)
@@ -161,6 +175,14 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		}
 		if body.Data.Name != "" || body.Data.LiveCount != 0 {
 			t.Errorf("data = %+v", body.Data)
+		}
+		var raw map[string]any
+		if err := json.Unmarshal(resp.Body.Bytes(), &raw); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		data := raw["data"].(map[string]any)
+		if _, ok := data["active_streaming"]; !ok {
+			t.Error("active_streaming harus ada (null)")
 		}
 		if svc.opts != (Options{Limit: 5}) {
 			t.Errorf("opts = %+v, ingin limit 5", svc.opts)
