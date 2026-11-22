@@ -15,6 +15,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
 	"github.com/Junx27/kicaugo-backend/internal/features/city"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
+	"github.com/Junx27/kicaugo-backend/internal/features/home"
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
@@ -45,6 +46,7 @@ func main() {
 	CityService := city.NewService(city.NewRepository(pool))
 	profileService := profile.NewService(profile.NewRepository(pool))
 	eventService := event.NewService(event.NewRepository(pool))
+	homeService := home.NewService(profileService, eventService)
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
@@ -57,6 +59,7 @@ func main() {
 		// scaffold:deps
 		Profile:        profileService,
 		Event:          eventService,
+		Home:           homeService,
 		Auth:           authService,
 		BirdCategories: birdCategoryService,
 	}); err != nil {
