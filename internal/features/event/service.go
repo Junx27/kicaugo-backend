@@ -24,6 +24,7 @@ type Service interface {
 	CountOngoing(ctx context.Context) (int, error)
 	Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error)
 	StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
+	UpdateStreamingJuara(ctx context.Context, identifier string, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
 	StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
@@ -88,6 +89,25 @@ func (s *service) StartStreaming(ctx context.Context, identifier string, in enti
 		return entities.EventStreaming{}, apperrors.ErrStreamingAlreadyActive
 	}
 	return s.repo.CreateStreaming(ctx, in)
+}
+
+// UpdateStreamingJuara memperbarui juara pada streaming aktif event.
+func (s *service) UpdateStreamingJuara(ctx context.Context, identifier string, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error) {
+	if err := validateUpdateStreamingJuaraInput(in); err != nil {
+		return entities.EventStreaming{}, err
+	}
+	ev, err := s.repo.EventByID(ctx, in.EventID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	active, err := s.repo.IsActiveOrganizerMember(ctx, identifier, ev.OrganizerID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	if !active {
+		return entities.EventStreaming{}, apperrors.ErrForbidden
+	}
+	return s.repo.UpdateStreamingJuara(ctx, in)
 }
 
 // StopStreaming menghentikan streaming aktif milik event organizer.
@@ -174,16 +194,17 @@ func isValidEventStatus(status string) bool {
 
 func normalizeStartStreamingInput(in *entities.StartEventStreamingInput) {
 	in.LinkStream = strings.TrimSpace(in.LinkStream)
-	if len(in.Juara) == 0 {
-		in.Juara = []byte("{}")
-	}
 }
 
 func validateStartStreamingInput(in entities.StartEventStreamingInput) error {
 	if in.EventID <= 0 || in.LinkStream == "" {
 		return apperrors.ErrInvalidPayload
 	}
-	if !json.Valid(in.Juara) {
+	return nil
+}
+
+func validateUpdateStreamingJuaraInput(in entities.UpdateEventStreamingJuaraInput) error {
+	if in.EventID <= 0 || len(in.Juara) == 0 || !json.Valid(in.Juara) {
 		return apperrors.ErrInvalidPayload
 	}
 	return nil

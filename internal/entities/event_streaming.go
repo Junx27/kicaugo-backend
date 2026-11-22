@@ -22,7 +22,12 @@ type EventStreaming struct {
 type StartEventStreamingInput struct {
 	EventID    int64
 	LinkStream string
-	Juara      json.RawMessage
+}
+
+// UpdateEventStreamingJuaraInput adalah data untuk memperbarui juara streaming aktif.
+type UpdateEventStreamingJuaraInput struct {
+	EventID int64
+	Juara   json.RawMessage
 }
 
 // ActiveEventStreaming adalah ringkasan streaming aktif untuk halaman home.

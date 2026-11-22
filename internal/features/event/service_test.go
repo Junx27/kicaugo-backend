@@ -34,6 +34,9 @@ type fakeRepository struct {
 	streamingResult    entities.EventStreaming
 	streamingErr       error
 	streamingIn        entities.StartEventStreamingInput
+	updateJuaraIn      entities.UpdateEventStreamingJuaraInput
+	updateJuaraResult  entities.EventStreaming
+	updateJuaraErr     error
 	stopResult         entities.EventStreaming
 	stopErr            error
 	stopEventID        int64
@@ -78,6 +81,11 @@ func (f *fakeRepository) HasActiveStreaming(ctx context.Context, eventID int64) 
 func (f *fakeRepository) CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
 	f.streamingIn = in
 	return f.streamingResult, f.streamingErr
+}
+
+func (f *fakeRepository) UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error) {
+	f.updateJuaraIn = in
+	return f.updateJuaraResult, f.updateJuaraErr
 }
 
 func (f *fakeRepository) StopStreaming(ctx context.Context, eventID int64) (entities.EventStreaming, error) {
@@ -253,7 +261,7 @@ func TestServiceStopStreaming(t *testing.T) {
 }
 
 func TestServiceStartStreaming(t *testing.T) {
-	valid := entities.StartEventStreamingInput{EventID: 10, LinkStream: " https://stream.test/live ", Juara: []byte(`{"rank":1}`)}
+	valid := entities.StartEventStreamingInput{EventID: 10, LinkStream: " https://stream.test/live "}
 	ev := entities.Event{ID: 10, OrganizerID: 5, Status: "published"}
 
 	t.Run("berhasil", func(t *testing.T) {
@@ -266,13 +274,6 @@ func TestServiceStartStreaming(t *testing.T) {
 
 	t.Run("payload invalid", func(t *testing.T) {
 		_, err := NewService(&fakeRepository{}).StartStreaming(context.Background(), "x", entities.StartEventStreamingInput{})
-		if !errors.Is(err, apperrors.ErrInvalidPayload) {
-			t.Fatalf("err=%v", err)
-		}
-	})
-
-	t.Run("juara invalid", func(t *testing.T) {
-		_, err := NewService(&fakeRepository{}).StartStreaming(context.Background(), "x", entities.StartEventStreamingInput{EventID: 1, LinkStream: "x", Juara: []byte("{")})
 		if !errors.Is(err, apperrors.ErrInvalidPayload) {
 			t.Fatalf("err=%v", err)
 		}
@@ -333,12 +334,59 @@ func TestServiceStartStreaming(t *testing.T) {
 			t.Fatal("ingin error")
 		}
 	})
+}
 
-	t.Run("default juara kosong", func(t *testing.T) {
-		repo := &fakeRepository{eventByID: ev, activeMember: true, streamingResult: entities.EventStreaming{ID: 1}}
-		_, err := NewService(repo).StartStreaming(context.Background(), "x", entities.StartEventStreamingInput{EventID: 10, LinkStream: "https://x"})
-		if err != nil || string(repo.streamingIn.Juara) != "{}" {
-			t.Fatalf("err=%v juara=%s", err, string(repo.streamingIn.Juara))
+func TestServiceUpdateStreamingJuara(t *testing.T) {
+	ev := entities.Event{ID: 10, OrganizerID: 5, Status: "published"}
+	valid := entities.UpdateEventStreamingJuaraInput{EventID: 10, Juara: []byte(`{"rank1":"A"}`)}
+
+	t.Run("berhasil", func(t *testing.T) {
+		repo := &fakeRepository{eventByID: ev, activeMember: true, updateJuaraResult: entities.EventStreaming{ID: 7, EventID: 10, Juara: valid.Juara}}
+		got, err := NewService(repo).UpdateStreamingJuara(context.Background(), "user@example.com", valid)
+		if err != nil || got.ID != 7 || string(repo.updateJuaraIn.Juara) != `{"rank1":"A"}` {
+			t.Fatalf("got=%+v err=%v in=%+v", got, err, repo.updateJuaraIn)
+		}
+	})
+	t.Run("payload invalid", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{}).UpdateStreamingJuara(context.Background(), "x", entities.UpdateEventStreamingJuaraInput{})
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("juara invalid", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{}).UpdateStreamingJuara(context.Background(), "x", entities.UpdateEventStreamingJuaraInput{EventID: 10, Juara: []byte("{")})
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("event not found", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByIDErr: apperrors.ErrNotFound}).UpdateStreamingJuara(context.Background(), "x", valid)
+		if !errors.Is(err, apperrors.ErrNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("cek membership error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeErr: errors.New("db down")}).UpdateStreamingJuara(context.Background(), "x", valid)
+		if err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+	t.Run("bukan anggota aktif", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: false}).UpdateStreamingJuara(context.Background(), "x", valid)
+		if !errors.Is(err, apperrors.ErrForbidden) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("streaming tidak aktif", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: true, updateJuaraErr: apperrors.ErrStreamingNotActive}).UpdateStreamingJuara(context.Background(), "x", valid)
+		if !errors.Is(err, apperrors.ErrStreamingNotActive) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("repo error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: true, updateJuaraErr: errors.New("db down")}).UpdateStreamingJuara(context.Background(), "x", valid)
+		if err == nil {
+			t.Fatal("ingin error")
 		}
 	})
 }

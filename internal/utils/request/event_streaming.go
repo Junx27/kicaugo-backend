@@ -6,8 +6,15 @@ import "encoding/json"
 type StartEventStreamingInput struct {
 	ID   int64 `path:"id" minimum:"1" doc:"ID event"`
 	Body struct {
-		LinkStream string          `json:"link_stream" required:"true" minLength:"1" maxLength:"2048" doc:"URL/link streaming"`
-		Juara      json.RawMessage `json:"juara,omitempty" doc:"Informasi juara dalam format JSON"`
+		LinkStream string `json:"link_stream" required:"true" minLength:"1" maxLength:"2048" doc:"URL/link streaming"`
+	}
+}
+
+// UpdateEventStreamingJuaraInput adalah input PATCH /api/v1/events/{id}/streamings/juara.
+type UpdateEventStreamingJuaraInput struct {
+	ID   int64 `path:"id" minimum:"1" doc:"ID event"`
+	Body struct {
+		Juara json.RawMessage `json:"juara" required:"true" doc:"Informasi juara dalam format JSON"`
 	}
 }
 

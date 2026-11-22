@@ -26,6 +26,7 @@ type Repository interface {
 	EventByID(ctx context.Context, eventID int64) (entities.Event, error)
 	HasActiveStreaming(ctx context.Context, eventID int64) (bool, error)
 	CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
+	UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
 	StopStreaming(ctx context.Context, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
@@ -287,10 +288,10 @@ func (r *repository) HasActiveStreaming(ctx context.Context, eventID int64) (boo
 // CreateStreaming menyimpan sesi streaming event.
 func (r *repository) CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
 	const query = `INSERT INTO event_streamings (event_id, start_time, total_views, juara, link_stream)
-		VALUES ($1, now(), 0, $2, $3)
+		VALUES ($1, now(), 0, '{}'::jsonb, $2)
 		RETURNING id, event_id, start_time, end_time, total_views, juara, link_stream, created_at, updated_at`
 	var out entities.EventStreaming
-	err := r.db.QueryRow(ctx, query, in.EventID, in.Juara, in.LinkStream).Scan(
+	err := r.db.QueryRow(ctx, query, in.EventID, in.LinkStream).Scan(
 		&out.ID, &out.EventID, &out.StartTime, &out.EndTime, &out.TotalViews, &out.Juara, &out.LinkStream, &out.CreatedAt, &out.UpdatedAt,
 	)
 	if err != nil {
@@ -308,6 +309,25 @@ func mapCreateStreamingError(err error) error {
 		return apperrors.ErrNotFound
 	}
 	return fmt.Errorf("create event streaming: %w", err)
+}
+
+// UpdateStreamingJuara memperbarui juara pada streaming aktif event.
+func (r *repository) UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error) {
+	const query = `UPDATE event_streamings
+		SET juara = $2, updated_at = now()
+		WHERE event_id = $1 AND end_time IS NULL
+		RETURNING id, event_id, start_time, end_time, total_views, juara, link_stream, created_at, updated_at`
+	var out entities.EventStreaming
+	err := r.db.QueryRow(ctx, query, in.EventID, in.Juara).Scan(
+		&out.ID, &out.EventID, &out.StartTime, &out.EndTime, &out.TotalViews, &out.Juara, &out.LinkStream, &out.CreatedAt, &out.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entities.EventStreaming{}, apperrors.ErrStreamingNotActive
+	}
+	if err != nil {
+		return entities.EventStreaming{}, fmt.Errorf("update event streaming juara: %w", err)
+	}
+	return out, nil
 }
 
 // StopStreaming menghentikan streaming aktif milik event.

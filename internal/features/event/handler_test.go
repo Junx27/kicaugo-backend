@@ -25,18 +25,22 @@ type fakeService struct {
 		cat    int64
 		limit  int
 	}
-	createResult    entities.EventDetail
-	createErr       error
-	createIn        entities.EventCreate
-	createID        string
-	streamingResult entities.EventStreaming
-	streamingErr    error
-	streamingIn     entities.StartEventStreamingInput
-	streamingID     string
-	stopResult      entities.EventStreaming
-	stopErr         error
-	stopEventID     int64
-	stopID          string
+	createResult      entities.EventDetail
+	createErr         error
+	createIn          entities.EventCreate
+	createID          string
+	streamingResult   entities.EventStreaming
+	streamingErr      error
+	streamingIn       entities.StartEventStreamingInput
+	streamingID       string
+	updateJuaraResult entities.EventStreaming
+	updateJuaraErr    error
+	updateJuaraIn     entities.UpdateEventStreamingJuaraInput
+	updateJuaraID     string
+	stopResult        entities.EventStreaming
+	stopErr           error
+	stopEventID       int64
+	stopID            string
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -60,6 +64,12 @@ func (f *fakeService) StartStreaming(ctx context.Context, identifier string, in 
 	f.streamingIn = in
 	f.streamingID = identifier
 	return f.streamingResult, f.streamingErr
+}
+
+func (f *fakeService) UpdateStreamingJuara(ctx context.Context, identifier string, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error) {
+	f.updateJuaraIn = in
+	f.updateJuaraID = identifier
+	return f.updateJuaraResult, f.updateJuaraErr
 }
 
 func (f *fakeService) StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error) {
@@ -277,10 +287,10 @@ func TestCreateEventHandler(t *testing.T) {
 }
 
 func TestStartEventStreamingHandler(t *testing.T) {
-	body := `{"link_stream":"https://youtube.com/live/abc","juara":{"rank1":"A"}}`
+	body := `{"link_stream":"https://youtube.com/live/abc"}`
 	t.Run("berhasil", func(t *testing.T) {
 		start := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
-		svc := &fakeService{streamingResult: entities.EventStreaming{ID: 3, EventID: 68, StartTime: start, TotalViews: 0, Juara: []byte(`{"rank1":"A"}`), LinkStream: "https://youtube.com/live/abc"}}
+		svc := &fakeService{streamingResult: entities.EventStreaming{ID: 3, EventID: 68, StartTime: start, TotalViews: 0, Juara: []byte(`{}`), LinkStream: "https://youtube.com/live/abc"}}
 		_, api := humatest.New(t)
 		tokens := newTestTokens()
 		RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
@@ -299,8 +309,8 @@ func TestStartEventStreamingHandler(t *testing.T) {
 		if err := json.Unmarshal(resp.Body.Bytes(), &out); err != nil {
 			t.Fatalf("json: %v", err)
 		}
-		if out.Data.ID != 3 || out.Data.EventID != 68 || out.Data.LinkStream != "https://youtube.com/live/abc" {
-			t.Fatalf("data=%+v", out.Data)
+		if out.Data.ID != 3 || out.Data.EventID != 68 || out.Data.LinkStream != "https://youtube.com/live/abc" || string(out.Data.Juara) != "{}" {
+			t.Fatalf("data=%+v juara=%s", out.Data, string(out.Data.Juara))
 		}
 		if svc.streamingIn.EventID != 68 || svc.streamingIn.LinkStream != "https://youtube.com/live/abc" {
 			t.Fatalf("in=%+v", svc.streamingIn)
@@ -342,6 +352,55 @@ func TestStartEventStreamingHandler(t *testing.T) {
 		RegisterRoutes(api, &fakeService{streamingErr: apperrors.ErrEventNotStreamable}, tokens, fakeOrganizerChecker{active: true})
 		resp := api.Post("/api/v1/events/68/streamings/start", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
 		if resp.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+}
+
+func TestUpdateEventStreamingJuaraHandler(t *testing.T) {
+	body := `{"juara":{"rank1":"A"}}`
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{updateJuaraResult: entities.EventStreaming{ID: 3, EventID: 68, Juara: []byte(`{"rank1":"A"}`), LinkStream: "https://youtube.com/live/abc"}}
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Patch("/api/v1/events/68/streamings/juara", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+		var out struct {
+			Data struct {
+				ID    int64           `json:"id"`
+				Juara json.RawMessage `json:"juara"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &out); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if out.Data.ID != 3 || string(out.Data.Juara) != `{"rank1":"A"}` || svc.updateJuaraIn.EventID != 68 {
+			t.Fatalf("out=%+v in=%+v", out, svc.updateJuaraIn)
+		}
+	})
+	t.Run("unauthorized", func(t *testing.T) {
+		_, api := humatest.New(t)
+		RegisterRoutes(api, &fakeService{}, newTestTokens(), fakeOrganizerChecker{active: true})
+		if resp := api.Patch("/api/v1/events/68/streamings/juara", "Content-Type: application/json", strings.NewReader(body)); resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+	t.Run("forbidden bukan organizer", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{}, tokens, fakeOrganizerChecker{active: false})
+		if resp := api.Patch("/api/v1/events/68/streamings/juara", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body)); resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+	t.Run("no active streaming", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{updateJuaraErr: apperrors.ErrStreamingNotActive}, tokens, fakeOrganizerChecker{active: true})
+		if resp := api.Patch("/api/v1/events/68/streamings/juara", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body)); resp.Code != http.StatusConflict {
 			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
 		}
 	})

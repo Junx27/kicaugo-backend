@@ -133,13 +133,40 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 		created, err := service.StartStreaming(ctx, identifier, entities.StartEventStreamingInput{
 			EventID:    input.ID,
 			LinkStream: input.Body.LinkStream,
-			Juara:      input.Body.Juara,
 		})
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
 		resp := &response.StartEventStreamingOutput{Status: http.StatusCreated}
 		resp.Body = response.NewSuccess(http.StatusCreated, "Event streaming started", toStreamingData(created))
+		return resp, nil
+	})
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:       "updateEventStreamingJuara",
+		Method:   http.MethodPatch,
+		Path:     "/api/v1/events/{id}/streamings/juara",
+		Summary:  "Update Event Streaming Juara",
+		Tags:     []string{"event"},
+		Security: []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+			middlewares.OrganizerOnly[jwt.Claims](organizerChecker, func(c jwt.Claims) string { return c.Subject }),
+		},
+	}, func(ctx context.Context, input *request.UpdateEventStreamingJuaraInput) (*response.UpdateEventStreamingJuaraOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		updated, err := service.UpdateStreamingJuara(ctx, identifier, entities.UpdateEventStreamingJuaraInput{
+			EventID: input.ID,
+			Juara:   input.Body.Juara,
+		})
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.UpdateEventStreamingJuaraOutput{Status: http.StatusOK}
+		resp.Body = response.NewSuccess(http.StatusOK, "Event streaming juara updated", toStreamingData(updated))
 		return resp, nil
 	})
 

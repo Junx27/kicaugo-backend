@@ -24,3 +24,9 @@ type StopEventStreamingOutput struct {
 	Status int `status:"200"`
 	Body   Success[EventStreamingData]
 }
+
+// UpdateEventStreamingJuaraOutput adalah output PATCH /api/v1/events/{id}/streamings/juara.
+type UpdateEventStreamingJuaraOutput struct {
+	Status int `status:"200"`
+	Body   Success[EventStreamingData]
+}
