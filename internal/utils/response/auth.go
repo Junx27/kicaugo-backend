@@ -24,12 +24,6 @@ type LoginOutput struct {
 	Body   Success[AuthData]
 }
 
-// MeOutput adalah output untuk GET /me.
-type MeOutput struct {
-	Status int `status:"200"`
-	Body   Success[UserData]
-}
-
 // LogoutOutput adalah output untuk logout.
 type LogoutOutput struct {
 	Status int `status:"204"`

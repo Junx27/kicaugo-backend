@@ -114,14 +114,3 @@ func TestServiceLogin(t *testing.T) {
 		}
 	})
 }
-
-func TestServiceProfile(t *testing.T) {
-	repo := newFakeRepository()
-	repo.users["test@gmail.com"] = entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}
-	service, _ := newTestService(repo)
-
-	user, err := service.Profile(context.Background(), "test@gmail.com")
-	if err != nil || user.Name != "Kicau Mania" {
-		t.Errorf("Profile() = %+v, %v", user, err)
-	}
-}

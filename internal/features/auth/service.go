@@ -63,11 +63,6 @@ func (s *Service) Login(ctx context.Context, identifier, password string) (entit
 	return s.issue(user)
 }
 
-// Profile mengambil pengguna berdasarkan identifier dari token.
-func (s *Service) Profile(ctx context.Context, identifier string) (entities.User, error) {
-	return s.repo.FindByIdentifier(ctx, identifier)
-}
-
 func (s *Service) issue(user entities.User) (entities.AuthResult, error) {
 	token, err := s.tokens.Issue(user.Identifier, user.Name)
 	if err != nil {

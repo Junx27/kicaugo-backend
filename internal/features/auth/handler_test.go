@@ -17,10 +17,8 @@ import (
 )
 
 type fakeAuthService struct {
-	result     entities.AuthResult
-	err        error
-	profile    entities.User
-	profileErr error
+	result entities.AuthResult
+	err    error
 }
 
 func (f *fakeAuthService) Register(ctx context.Context, name, identifier, password string) (entities.AuthResult, error) {
@@ -29,10 +27,6 @@ func (f *fakeAuthService) Register(ctx context.Context, name, identifier, passwo
 
 func (f *fakeAuthService) Login(ctx context.Context, identifier, password string) (entities.AuthResult, error) {
 	return f.result, f.err
-}
-
-func (f *fakeAuthService) Profile(ctx context.Context, identifier string) (entities.User, error) {
-	return f.profile, f.profileErr
 }
 
 func TestRegister(t *testing.T) {
@@ -156,58 +150,4 @@ func TestLogout(t *testing.T) {
 	if resp.Code != http.StatusNoContent {
 		t.Errorf("status = %d, ingin 204; body=%s", resp.Code, resp.Body.String())
 	}
-}
-
-func TestMe(t *testing.T) {
-	t.Run("berhasil", func(t *testing.T) {
-		_, api := humatest.New(t)
-		svc := &fakeAuthService{profile: entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}}
-		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
-		RegisterRoutes(api, svc, tokens)
-
-		token, _ := tokens.Issue("test@gmail.com", "Kicau Mania")
-		resp := api.Get("/api/v1/auth/me", "Authorization: Bearer "+token)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, ingin 200; body=%s", resp.Code, resp.Body.String())
-		}
-		var body struct {
-			Status  int               `json:"status"`
-			Message string            `json:"message"`
-			Data    response.UserData `json:"data"`
-		}
-		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
-			t.Fatal(err)
-		}
-		if body.Status != http.StatusOK {
-			t.Errorf("status = %d, ingin %d", body.Status, http.StatusOK)
-		}
-		if body.Data.Name != "Kicau Mania" {
-			t.Errorf("response = %+v", body)
-		}
-	})
-
-	t.Run("tanpa token", func(t *testing.T) {
-		_, api := humatest.New(t)
-		svc := &fakeAuthService{}
-		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
-		RegisterRoutes(api, svc, tokens)
-
-		resp := api.Get("/api/v1/auth/me")
-		if resp.Code != http.StatusUnauthorized {
-			t.Errorf("status = %d, ingin 401", resp.Code)
-		}
-	})
-
-	t.Run("profil gagal", func(t *testing.T) {
-		_, api := humatest.New(t)
-		svc := &fakeAuthService{profileErr: errors.New("db down")}
-		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
-		RegisterRoutes(api, svc, tokens)
-
-		token, _ := tokens.Issue("test@gmail.com", "Kicau Mania")
-		resp := api.Get("/api/v1/auth/me", "Authorization: Bearer "+token)
-		if resp.Code != http.StatusInternalServerError {
-			t.Errorf("status = %d, ingin 500", resp.Code)
-		}
-	})
 }

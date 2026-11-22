@@ -73,30 +73,6 @@ func RegisterRoutes(api apphttp.API, service AuthService, tokens *jwt.Manager) {
 		resp.Status = http.StatusNoContent
 		return resp, nil
 	})
-
-	// GET /api/v1/auth/me
-	apphttp.Register(api, apphttp.Operation{
-		ID:          "me",
-		Method:      http.MethodGet,
-		Path:        "/api/v1/auth/me",
-		Summary:     "Get Profile",
-		Tags:        []string{"auth"},
-		Security:    []map[string][]string{{"bearerAuth": {}}},
-		Middlewares: []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)},
-	}, func(ctx context.Context, input *struct{}) (*response.MeOutput, error) {
-		claims, ok := middlewares.UserFromContext[jwt.Claims](ctx)
-		if !ok {
-			return nil, apphttp.Unauthorized("Authentication required")
-		}
-		result, err := service.Profile(ctx, claims.Subject)
-		if err != nil {
-			return nil, mapServiceError(err)
-		}
-		resp := &response.MeOutput{}
-		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded successfully", toData(result))
-		return resp, nil
-	})
 	// scaffold:routes
 }
 
@@ -123,5 +99,4 @@ func mapServiceError(err error) error {
 type AuthService interface {
 	Register(ctx context.Context, name, identifier, password string) (entities.AuthResult, error)
 	Login(ctx context.Context, identifier, password string) (entities.AuthResult, error)
-	Profile(ctx context.Context, identifier string) (entities.User, error)
 }
