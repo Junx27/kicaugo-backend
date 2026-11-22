@@ -16,7 +16,8 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
-func toProfileData(view ProfileView) response.ProfileData {
+// ToData mengubah ProfileView menjadi data response profil.
+func ToData(view ProfileView) response.ProfileData {
 	p := view.Profile
 	data := response.ProfileData{
 		FullName:           p.FullName,
@@ -73,7 +74,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		}
 		resp := &response.ProfileOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded", toProfileData(view))
+		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded", ToData(view))
 		return resp, nil
 	})
 

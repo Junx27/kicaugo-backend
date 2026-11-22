@@ -15,7 +15,8 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
-func toData(result NearbyResult) response.NearbyEventsData {
+// ToData mengubah NearbyResult menjadi data response event terdekat.
+func ToData(result NearbyResult) response.NearbyEventsData {
 	data := response.NearbyEventsData{
 		OriginSource: originNone,
 		RadiusKM:     result.RadiusKM,
@@ -83,7 +84,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		}
 		resp := &response.NearbyEventsOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Nearby events loaded", toData(result))
+		resp.Body = response.NewSuccess(http.StatusOK, "Nearby events loaded", ToData(result))
 		return resp, nil
 	})
 }
