@@ -8,56 +8,26 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
+	"github.com/Junx27/kicaugo-backend/internal/utils/request"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
-// {{.DomainPascal}}Payload adalah representasi {{.Domain}} di response.
-type {{.DomainPascal}}Payload struct {
-	ID int64 `json:"id"`
-{{range .Fields}}	{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}"`
-{{end}}}
-
-type ListOutput struct {
-	Status int `status:"200"`
-	Body   response.Success[[]{{.DomainPascal}}Payload]
-}
-
-type GetOutput struct {
-	Status int `status:"200"`
-	Body   response.Success[{{.DomainPascal}}Payload]
-}
-
-type CreateInput struct {
-	Body struct {
-{{range .Fields}}		{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}" required:"true"`
-{{end}}	}
-}
-
-type CreateOutput struct {
-	Status int `status:"201"`
-	Body   response.Success[{{.DomainPascal}}Payload]
-}
-
-type UpdateInput struct {
-	ID int64 `path:"id"`
-	Body struct {
-{{range .Fields}}		{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}" required:"true"`
-{{end}}	}
-}
-
-type UpdateOutput struct {
-	Status int `status:"200"`
-	Body   response.Success[{{.DomainPascal}}Payload]
-}
-
-type DeleteOutput struct {
-	Status int `status:"204"`
-}
-
-func toPayload(c entities.{{.DomainPascal}}) {{.DomainPascal}}Payload {
-	p := {{.DomainPascal}}Payload{ID: c.ID}
+func toPayload(c entities.{{.DomainPascal}}) response.{{.DomainPascal}}Payload {
+	p := response.{{.DomainPascal}}Payload{ID: c.ID}
 {{range .Fields}}	p.{{.GoName}} = c.{{.GoName}}
 {{end}}	return p
+}
+
+func toEntity(input *request.Create{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
+	e := entities.{{.DomainPascal}}{}
+{{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
+{{end}}	return e
+}
+
+func toEntityUpdate(input *request.Update{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
+	e := entities.{{.DomainPascal}}{}
+{{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
+{{end}}	return e
 }
 
 // RegisterRoutes mendaftarkan route {{.Domain}} ke Huma API.
@@ -69,16 +39,16 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Path:    "/api/v1/{{.Domain}}s",
 		Summary: "List {{.DomainPascal}}s",
 		Tags:    []string{"{{.Domain}}"},
-	}, func(ctx context.Context, input *struct{}) (*ListOutput, error) {
+	}, func(ctx context.Context, input *struct{}) (*response.{{.DomainPascal}}ListOutput, error) {
 		items, err := service.List(ctx)
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		payloads := make([]{{.DomainPascal}}Payload, 0, len(items))
+		payloads := make([]response.{{.DomainPascal}}Payload, 0, len(items))
 		for _, it := range items {
 			payloads = append(payloads, toPayload(it))
 		}
-		resp := &ListOutput{}
+		resp := &response.{{.DomainPascal}}ListOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}}s loaded", payloads)
 		return resp, nil
@@ -93,12 +63,12 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Tags:    []string{"{{.Domain}}"},
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
-	}) (*GetOutput, error) {
+	}) (*response.{{.DomainPascal}}GetOutput, error) {
 		it, err := service.GetByID(ctx, input.ID)
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		resp := &GetOutput{}
+		resp := &response.{{.DomainPascal}}GetOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} loaded", toPayload(it))
 		return resp, nil
@@ -111,12 +81,12 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Path:    "/api/v1/{{.Domain}}s",
 		Summary: "Create {{.DomainPascal}}",
 		Tags:    []string{"{{.Domain}}"},
-	}, func(ctx context.Context, input *CreateInput) (*CreateOutput, error) {
+	}, func(ctx context.Context, input *request.Create{{.DomainPascal}}Input) (*response.{{.DomainPascal}}CreateOutput, error) {
 		it, err := service.Create(ctx, toEntity(input))
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		resp := &CreateOutput{}
+		resp := &response.{{.DomainPascal}}CreateOutput{}
 		resp.Status = http.StatusCreated
 		resp.Body = response.NewSuccess(http.StatusCreated, "{{.DomainPascal}} created", toPayload(it))
 		return resp, nil
@@ -129,12 +99,12 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Path:    "/api/v1/{{.Domain}}s/{id}",
 		Summary: "Update {{.DomainPascal}}",
 		Tags:    []string{"{{.Domain}}"},
-	}, func(ctx context.Context, input *UpdateInput) (*UpdateOutput, error) {
+	}, func(ctx context.Context, input *request.Update{{.DomainPascal}}Input) (*response.{{.DomainPascal}}UpdateOutput, error) {
 		it, err := service.Update(ctx, input.ID, toEntityUpdate(input))
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		resp := &UpdateOutput{}
+		resp := &response.{{.DomainPascal}}UpdateOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} updated", toPayload(it))
 		return resp, nil
@@ -149,26 +119,14 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		Tags:    []string{"{{.Domain}}"},
 	}, func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
-	}) (*DeleteOutput, error) {
+	}) (*response.{{.DomainPascal}}DeleteOutput, error) {
 		if err := service.Delete(ctx, input.ID); err != nil {
 			return nil, mapServiceError(err)
 		}
-		resp := &DeleteOutput{}
+		resp := &response.{{.DomainPascal}}DeleteOutput{}
 		resp.Status = http.StatusNoContent
 		return resp, nil
 	})
-}
-
-func toEntity(input *CreateInput) entities.{{.DomainPascal}} {
-	e := entities.{{.DomainPascal}}{}
-{{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
-{{end}}	return e
-}
-
-func toEntityUpdate(input *UpdateInput) entities.{{.DomainPascal}} {
-	e := entities.{{.DomainPascal}}{}
-{{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
-{{end}}	return e
 }
 
 func mapServiceError(err error) error {

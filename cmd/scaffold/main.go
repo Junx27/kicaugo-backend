@@ -123,6 +123,30 @@ func main() {
 		created = append(created, outPath)
 	}
 
+	// 3b. request/response DTOs in utils
+	reqDir := filepath.Join("internal", "utils", "request")
+	respDir := filepath.Join("internal", "utils", "response")
+	reqPath := filepath.Join(reqDir, domain+".go")
+	respPath := filepath.Join(respDir, domain+".go")
+	if _, err := os.Stat(reqPath); err == nil {
+		rollback()
+		fail("file sudah ada: " + reqPath)
+	}
+	if _, err := os.Stat(respPath); err == nil {
+		rollback()
+		fail("file sudah ada: " + respPath)
+	}
+	if err := renderTemplate("request.go.tmpl", reqPath, d); err != nil {
+		rollback()
+		fail(err.Error())
+	}
+	created = append(created, reqPath)
+	if err := renderTemplate("response.go.tmpl", respPath, d); err != nil {
+		rollback()
+		fail(err.Error())
+	}
+	created = append(created, respPath)
+
 	// 4. wiring injection (backup first)
 	backupMain, _ := os.ReadFile("cmd/api/main.go")
 	backupServer, _ := os.ReadFile("cmd/server/server.go")

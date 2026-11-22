@@ -1,0 +1,36 @@
+package response
+
+// {{.DomainPascal}}Payload adalah representasi {{.Domain}} di response.
+type {{.DomainPascal}}Payload struct {
+	ID int64 `json:"id"`
+{{range .Fields}}	{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}"`
+{{end}}}
+
+// {{.DomainPascal}}ListOutput adalah output untuk GET list.
+type {{.DomainPascal}}ListOutput struct {
+	Status int `status:"200"`
+	Body   Success[[]{{.DomainPascal}}Payload]
+}
+
+// {{.DomainPascal}}GetOutput adalah output untuk GET by id.
+type {{.DomainPascal}}GetOutput struct {
+	Status int `status:"200"`
+	Body   Success[{{.DomainPascal}}Payload]
+}
+
+// {{.DomainPascal}}CreateOutput adalah output untuk POST.
+type {{.DomainPascal}}CreateOutput struct {
+	Status int `status:"201"`
+	Body   Success[{{.DomainPascal}}Payload]
+}
+
+// {{.DomainPascal}}UpdateOutput adalah output untuk PUT.
+type {{.DomainPascal}}UpdateOutput struct {
+	Status int `status:"200"`
+	Body   Success[{{.DomainPascal}}Payload]
+}
+
+// {{.DomainPascal}}DeleteOutput adalah output untuk DELETE.
+type {{.DomainPascal}}DeleteOutput struct {
+	Status int `status:"204"`
+}

@@ -1,0 +1,16 @@
+package request
+
+// Create{{.DomainPascal}}Input adalah input untuk membuat {{.Domain}}.
+type Create{{.DomainPascal}}Input struct {
+	Body struct {
+{{range .Fields}}		{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}" required:"true"`
+{{end}}	}
+}
+
+// Update{{.DomainPascal}}Input adalah input untuk memperbarui {{.Domain}}.
+type Update{{.DomainPascal}}Input struct {
+	ID int64 `path:"id"`
+	Body struct {
+{{range .Fields}}		{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}" required:"true"`
+{{end}}	}
+}
