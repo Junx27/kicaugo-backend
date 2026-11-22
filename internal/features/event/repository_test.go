@@ -179,19 +179,21 @@ func TestRepositoryCountOngoing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountOngoing() awal error = %v", err)
 	}
-	future := time.Now().AddDate(0, 0, 2)
-	expired := time.Now().AddDate(0, 0, -2)
-	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-" + testSuffix(t), status: "ongoing"})
-	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-akhir-" + testSuffix(t), status: "ongoing", endDate: &future})
-	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "selesai-" + testSuffix(t), status: "ongoing", endDate: &expired})
-	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "diterbitkan-" + testSuffix(t), status: "published"})
+	eventID := seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "streaming-" + testSuffix(t), status: "published"})
+	if _, err := conn.Exec(ctx, `INSERT INTO event_streamings (event_id, link_stream) VALUES ($1, 'https://stream.test/live')`, eventID); err != nil {
+		t.Fatalf("insert streaming: %v", err)
+	}
+	endedID := seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "selesai-stream-" + testSuffix(t), status: "published"})
+	if _, err := conn.Exec(ctx, `INSERT INTO event_streamings (event_id, link_stream, end_time) VALUES ($1, 'https://stream.test/end', now())`, endedID); err != nil {
+		t.Fatalf("insert ended streaming: %v", err)
+	}
 
 	after, err := repo.CountOngoing(ctx)
 	if err != nil {
 		t.Fatalf("CountOngoing() error = %v", err)
 	}
-	if after-before != 2 {
-		t.Errorf("jumlah event berlangsung bertambah %d, ingin 2", after-before)
+	if after-before != 1 {
+		t.Errorf("jumlah live streaming bertambah %d, ingin 1", after-before)
 	}
 }
 

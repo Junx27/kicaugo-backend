@@ -113,6 +113,35 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 		resp.Body = response.NewSuccess(http.StatusCreated, "Event created", toCreatedEventData(created))
 		return resp, nil
 	})
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:       "startEventStreaming",
+		Method:   http.MethodPost,
+		Path:     "/api/v1/events/{id}/streamings/start",
+		Summary:  "Start Event Streaming",
+		Tags:     []string{"event"},
+		Security: []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+			middlewares.OrganizerOnly[jwt.Claims](organizerChecker, func(c jwt.Claims) string { return c.Subject }),
+		},
+	}, func(ctx context.Context, input *request.StartEventStreamingInput) (*response.StartEventStreamingOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		created, err := service.StartStreaming(ctx, identifier, entities.StartEventStreamingInput{
+			EventID:    input.ID,
+			LinkStream: input.Body.LinkStream,
+			Juara:      input.Body.Juara,
+		})
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.StartEventStreamingOutput{Status: http.StatusCreated}
+		resp.Body = response.NewSuccess(http.StatusCreated, "Event streaming started", toStreamingData(created))
+		return resp, nil
+	})
 }
 
 func toCreateEntity(input *request.CreateEventInput) entities.EventCreate {
@@ -175,17 +204,31 @@ func toCreatedEventData(detail entities.EventDetail) response.EventData {
 	return data
 }
 
+func toStreamingData(s entities.EventStreaming) response.EventStreamingData {
+	data := response.EventStreamingData{
+		ID: s.ID, EventID: s.EventID, StartTime: s.StartTime.Format(time.RFC3339),
+		TotalViews: s.TotalViews, Juara: s.Juara, LinkStream: s.LinkStream,
+	}
+	if s.EndTime != nil {
+		v := s.EndTime.Format(time.RFC3339)
+		data.EndTime = &v
+	}
+	return data
+}
+
 func mapServiceError(err error) error {
 	switch {
 	case errors.Is(err, apperrors.ErrInvalidRadius),
 		errors.Is(err, apperrors.ErrInvalidPayload),
-		errors.Is(err, apperrors.ErrInvalidCategory):
+		errors.Is(err, apperrors.ErrInvalidCategory),
+		errors.Is(err, apperrors.ErrEventNotStreamable):
 		return apphttp.UnprocessableEntity("Please check your input data")
 	case errors.Is(err, apperrors.ErrNotFound), errors.Is(err, apperrors.ErrOrganizerNotFound):
 		return apphttp.NotFound("Resource not found")
 	case errors.Is(err, apperrors.ErrForbidden):
 		return apphttp.Forbidden("Organizer access required")
-	case errors.Is(err, apperrors.ErrIdentifierTaken):
+	case errors.Is(err, apperrors.ErrIdentifierTaken),
+		errors.Is(err, apperrors.ErrStreamingAlreadyActive):
 		return apphttp.Conflict("Event data already exists")
 	default:
 		return apphttp.InternalServerError("An error occurred. Please try again.")

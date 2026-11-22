@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -22,6 +23,8 @@ type Service interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error)
 	CountOngoing(ctx context.Context) (int, error)
 	Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error)
+	StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
+	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
 
 // service adalah implementasi Service.
@@ -54,6 +57,41 @@ func (s *service) Create(ctx context.Context, identifier string, in entities.Eve
 		return entities.EventDetail{}, apperrors.ErrForbidden
 	}
 	return s.repo.Create(ctx, in)
+}
+
+// StartStreaming memulai sesi streaming untuk event milik organizer aktif.
+func (s *service) StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
+	normalizeStartStreamingInput(&in)
+	if err := validateStartStreamingInput(in); err != nil {
+		return entities.EventStreaming{}, err
+	}
+	ev, err := s.repo.EventByID(ctx, in.EventID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	if err := ensureEventStreamable(ev.Status); err != nil {
+		return entities.EventStreaming{}, err
+	}
+	active, err := s.repo.IsActiveOrganizerMember(ctx, identifier, ev.OrganizerID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	if !active {
+		return entities.EventStreaming{}, apperrors.ErrForbidden
+	}
+	hasActive, err := s.repo.HasActiveStreaming(ctx, in.EventID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	if hasActive {
+		return entities.EventStreaming{}, apperrors.ErrStreamingAlreadyActive
+	}
+	return s.repo.CreateStreaming(ctx, in)
+}
+
+// GetActiveStreaming mengambil satu streaming aktif terbaru.
+func (s *service) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
+	return s.repo.GetActiveStreaming(ctx)
 }
 
 func validateCreateInput(in entities.EventCreate) error {
@@ -111,6 +149,32 @@ func isValidEventStatus(status string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func normalizeStartStreamingInput(in *entities.StartEventStreamingInput) {
+	in.LinkStream = strings.TrimSpace(in.LinkStream)
+	if len(in.Juara) == 0 {
+		in.Juara = []byte("{}")
+	}
+}
+
+func validateStartStreamingInput(in entities.StartEventStreamingInput) error {
+	if in.EventID <= 0 || in.LinkStream == "" {
+		return apperrors.ErrInvalidPayload
+	}
+	if !json.Valid(in.Juara) {
+		return apperrors.ErrInvalidPayload
+	}
+	return nil
+}
+
+func ensureEventStreamable(status string) error {
+	switch status {
+	case "published", "ongoing":
+		return nil
+	default:
+		return apperrors.ErrEventNotStreamable
 	}
 }
 

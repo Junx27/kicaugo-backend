@@ -23,6 +23,10 @@ type Repository interface {
 	CountOngoing(ctx context.Context) (int, error)
 	IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error)
 	Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error)
+	EventByID(ctx context.Context, eventID int64) (entities.Event, error)
+	HasActiveStreaming(ctx context.Context, eventID int64) (bool, error)
+	CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
+	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
 
 // db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
@@ -72,10 +76,9 @@ func (r *repository) Origin(ctx context.Context, identifier string) (entities.Or
 	return candidate, nil
 }
 
-// CountOngoing menghitung event berstatus ongoing yang belum terlewat tanggal akhirnya.
+// CountOngoing menghitung event yang sedang live/streaming aktif.
 func (r *repository) CountOngoing(ctx context.Context) (int, error) {
-	const query = `SELECT COUNT(*) FROM events
-		WHERE status = 'ongoing' AND (end_date IS NULL OR end_date >= CURRENT_DATE)`
+	const query = `SELECT COUNT(*) FROM event_streamings WHERE end_time IS NULL`
 	var count int
 	if err := r.db.QueryRow(ctx, query).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count ongoing events: %w", err)
@@ -250,4 +253,80 @@ func mapCreateEventError(err error) error {
 		return apperrors.ErrInvalidPayload
 	}
 	return fmt.Errorf("create event: %w", err)
+}
+
+// EventByID mengambil event ringkas untuk validasi streaming.
+func (r *repository) EventByID(ctx context.Context, eventID int64) (entities.Event, error) {
+	const query = `SELECT id, organizer_id, title, slug, venue, city, COALESCE(province, ''), city_id, province_id, latitude, longitude, start_date, end_date, status, banner_url
+		FROM events WHERE id = $1`
+	var out entities.Event
+	err := r.db.QueryRow(ctx, query, eventID).Scan(
+		&out.ID, &out.OrganizerID, &out.Title, &out.Slug, &out.Venue, &out.City, &out.Province,
+		&out.CityID, &out.ProvinceID, &out.Latitude, &out.Longitude, &out.StartDate, &out.EndDate, &out.Status, &out.BannerURL,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entities.Event{}, apperrors.ErrNotFound
+	}
+	if err != nil {
+		return entities.Event{}, fmt.Errorf("get event by id: %w", err)
+	}
+	return out, nil
+}
+
+// HasActiveStreaming memeriksa apakah event memiliki streaming yang masih aktif.
+func (r *repository) HasActiveStreaming(ctx context.Context, eventID int64) (bool, error) {
+	const query = `SELECT EXISTS (SELECT 1 FROM event_streamings WHERE event_id = $1 AND end_time IS NULL)`
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, eventID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check active streaming: %w", err)
+	}
+	return exists, nil
+}
+
+// CreateStreaming menyimpan sesi streaming event.
+func (r *repository) CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
+	const query = `INSERT INTO event_streamings (event_id, start_time, total_views, juara, link_stream)
+		VALUES ($1, now(), 0, $2, $3)
+		RETURNING id, event_id, start_time, end_time, total_views, juara, link_stream, created_at, updated_at`
+	var out entities.EventStreaming
+	err := r.db.QueryRow(ctx, query, in.EventID, in.Juara, in.LinkStream).Scan(
+		&out.ID, &out.EventID, &out.StartTime, &out.EndTime, &out.TotalViews, &out.Juara, &out.LinkStream, &out.CreatedAt, &out.UpdatedAt,
+	)
+	if err != nil {
+		return entities.EventStreaming{}, mapCreateStreamingError(err)
+	}
+	return out, nil
+}
+
+func mapCreateStreamingError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return apperrors.ErrStreamingAlreadyActive
+	}
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return apperrors.ErrNotFound
+	}
+	return fmt.Errorf("create event streaming: %w", err)
+}
+
+// GetActiveStreaming mengambil satu streaming aktif terbaru.
+func (r *repository) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
+	const query = `SELECT es.id, es.event_id, e.title, e.slug, e.venue, e.city, es.link_stream, es.start_time, es.end_time, es.total_views, es.juara
+		FROM event_streamings es
+		JOIN events e ON e.id = es.event_id
+		WHERE es.end_time IS NULL
+		ORDER BY es.start_time DESC, es.id DESC
+		LIMIT 1`
+	var out entities.ActiveEventStreaming
+	err := r.db.QueryRow(ctx, query).Scan(
+		&out.ID, &out.EventID, &out.EventTitle, &out.EventSlug, &out.Venue, &out.City,
+		&out.LinkStream, &out.StartTime, &out.EndTime, &out.TotalViews, &out.Juara,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get active streaming: %w", err)
+	}
+	return &out, nil
 }

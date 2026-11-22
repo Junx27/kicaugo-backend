@@ -25,10 +25,14 @@ type fakeService struct {
 		cat    int64
 		limit  int
 	}
-	createResult entities.EventDetail
-	createErr    error
-	createIn     entities.EventCreate
-	createID     string
+	createResult    entities.EventDetail
+	createErr       error
+	createIn        entities.EventCreate
+	createID        string
+	streamingResult entities.EventStreaming
+	streamingErr    error
+	streamingIn     entities.StartEventStreamingInput
+	streamingID     string
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -46,6 +50,16 @@ func (f *fakeService) Create(ctx context.Context, identifier string, in entities
 	f.createIn = in
 	f.createID = identifier
 	return f.createResult, f.createErr
+}
+
+func (f *fakeService) StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
+	f.streamingIn = in
+	f.streamingID = identifier
+	return f.streamingResult, f.streamingErr
+}
+
+func (f *fakeService) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
+	return nil, nil
 }
 
 func newTestTokens() *jwt.Manager {
@@ -252,6 +266,77 @@ func TestCreateEventHandler(t *testing.T) {
 	})
 }
 
+func TestStartEventStreamingHandler(t *testing.T) {
+	body := `{"link_stream":"https://youtube.com/live/abc","juara":{"rank1":"A"}}`
+	t.Run("berhasil", func(t *testing.T) {
+		start := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+		svc := &fakeService{streamingResult: entities.EventStreaming{ID: 3, EventID: 68, StartTime: start, TotalViews: 0, Juara: []byte(`{"rank1":"A"}`), LinkStream: "https://youtube.com/live/abc"}}
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events/68/streamings/start", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+		var out struct {
+			Data struct {
+				ID         int64           `json:"id"`
+				EventID    int64           `json:"event_id"`
+				LinkStream string          `json:"link_stream"`
+				Juara      json.RawMessage `json:"juara"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &out); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if out.Data.ID != 3 || out.Data.EventID != 68 || out.Data.LinkStream != "https://youtube.com/live/abc" {
+			t.Fatalf("data=%+v", out.Data)
+		}
+		if svc.streamingIn.EventID != 68 || svc.streamingIn.LinkStream != "https://youtube.com/live/abc" {
+			t.Fatalf("in=%+v", svc.streamingIn)
+		}
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		_, api := humatest.New(t)
+		RegisterRoutes(api, &fakeService{}, newTestTokens(), fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events/68/streamings/start", "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("forbidden bukan organizer", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{}, tokens, fakeOrganizerChecker{active: false})
+		resp := api.Post("/api/v1/events/68/streamings/start", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+
+	t.Run("conflict streaming aktif", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{streamingErr: apperrors.ErrStreamingAlreadyActive}, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events/68/streamings/start", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusConflict {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+
+	t.Run("event not streamable", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{streamingErr: apperrors.ErrEventNotStreamable}, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events/68/streamings/start", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+}
+
 func TestMapServiceError(t *testing.T) {
 	cases := []struct {
 		err  error
@@ -260,10 +345,12 @@ func TestMapServiceError(t *testing.T) {
 		{err: apperrors.ErrInvalidRadius, want: http.StatusUnprocessableEntity},
 		{err: apperrors.ErrInvalidPayload, want: http.StatusUnprocessableEntity},
 		{err: apperrors.ErrInvalidCategory, want: http.StatusUnprocessableEntity},
+		{err: apperrors.ErrEventNotStreamable, want: http.StatusUnprocessableEntity},
 		{err: apperrors.ErrNotFound, want: http.StatusNotFound},
 		{err: apperrors.ErrOrganizerNotFound, want: http.StatusNotFound},
 		{err: apperrors.ErrForbidden, want: http.StatusForbidden},
 		{err: apperrors.ErrIdentifierTaken, want: http.StatusConflict},
+		{err: apperrors.ErrStreamingAlreadyActive, want: http.StatusConflict},
 		{err: errors.New("boom"), want: http.StatusInternalServerError},
 	}
 	for _, tc := range cases {
