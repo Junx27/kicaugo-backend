@@ -28,6 +28,7 @@ Akun demo: `test@gmail.com` / `test123@`.
 
 ```
 cmd/api/                  # entrypoint + wiring config, database, service
+cmd/scaffold/             # generator fitur CRUD (make scaffold)
 cmd/server/               # konfigurasi HTTP server, router, middleware
 internal/config/          # konfigurasi environment
 internal/database/        # koneksi, migrations, indexes, seeders
@@ -42,7 +43,35 @@ internal/utils/request/   # tipe input request
 internal/utils/response/  # format dan tipe response API
 ```
 
-## Flutter
+## Scaffold Generator
+
+Gunakan `make scaffold` untuk membuat fitur CRUD baru secara otomatis (SQL → entities → features → utils → wiring).
+
+```bash
+# Fitur baru (full CRUD)
+make scaffold NAME=product FIELDS="Name:string,Price:int,Active:bool"
+
+# Fitur baru (hanya operasi tertentu)
+make scaffold NAME=order FIELDS="Total:int,Status:string" OPS="list,create"
+
+# Tambah operasi ke fitur yang sudah ada (contoh: delete)
+make scaffold NAME=birdcategory OPS=delete
+```
+
+Tipe field yang didukung: `string`, `int`, `int64`, `bool`, `float64`, `time`.
+
+Nilai `OPS`:
+- Shorthand: `crud` (default), `read` (`list`+`get`), `write` (`create`+`update`+`delete`)
+- Eksplisit: `create,list,get,update,delete` (comma-separated)
+
+Yang dihasilkan:
+- `internal/database/migrations/000N_<domain>_table.sql`
+- `internal/entities/<domain>.go`
+- `internal/features/<domain>/` (repository, service, handler, test)
+- `internal/utils/request/<domain>.go` dan `internal/utils/response/<domain>.go`
+- Wiring otomatis ke `cmd/api/main.go` dan `cmd/server/server.go`
+
+Generator menjalankan `gofmt` dan `go build` otomatis; rollback jika gagal. Operasi augment (fitur existing) menambahkan method/route via marker `// scaffold:*`.
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:8080
