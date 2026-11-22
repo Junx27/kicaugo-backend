@@ -9,24 +9,29 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
+
+	"github.com/Junx27/kicaugo-backend/internal/entities"
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
+	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
 type fakeAuthService struct {
-	result     Result
+	result     entities.AuthResult
 	err        error
-	profile    User
+	profile    entities.User
 	profileErr error
 }
 
-func (f *fakeAuthService) Register(ctx context.Context, name, identifier, password string) (Result, error) {
+func (f *fakeAuthService) Register(ctx context.Context, name, identifier, password string) (entities.AuthResult, error) {
 	return f.result, f.err
 }
 
-func (f *fakeAuthService) Login(ctx context.Context, identifier, password string) (Result, error) {
+func (f *fakeAuthService) Login(ctx context.Context, identifier, password string) (entities.AuthResult, error) {
 	return f.result, f.err
 }
 
-func (f *fakeAuthService) Profile(ctx context.Context, identifier string) (User, error) {
+func (f *fakeAuthService) Profile(ctx context.Context, identifier string) (entities.User, error) {
 	return f.profile, f.profileErr
 }
 
@@ -40,7 +45,7 @@ func TestRegister(t *testing.T) {
 		{
 			name:   "berhasil",
 			body:   `{"name":"Kicau Mania","identifier":"test@gmail.com","password":"test123@"}`,
-			svc:    &fakeAuthService{result: Result{User: User{Name: "Kicau Mania", Identifier: "test@gmail.com"}, Token: "jwt"}},
+			svc:    &fakeAuthService{result: entities.AuthResult{User: entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}, Token: "jwt"}},
 			status: http.StatusCreated,
 		},
 		{
@@ -58,7 +63,7 @@ func TestRegister(t *testing.T) {
 		{
 			name:   "identifier dipakai",
 			body:   `{"name":"Kicau Mania","identifier":"test@gmail.com","password":"test123@"}`,
-			svc:    &fakeAuthService{err: ErrIdentifierTaken},
+			svc:    &fakeAuthService{err: apperrors.ErrIdentifierTaken},
 			status: http.StatusConflict,
 		},
 		{
@@ -72,7 +77,7 @@ func TestRegister(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, api := humatest.New(t)
-			tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+			tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 			RegisterRoutes(api, tc.svc, tokens)
 
 			resp := api.Post("/api/v1/auth/register", strings.NewReader(tc.body))
@@ -80,22 +85,22 @@ func TestRegister(t *testing.T) {
 				t.Fatalf("status = %d, ingin %d; body = %s", resp.Code, tc.status, resp.Body.String())
 			}
 			if tc.status == http.StatusCreated {
-				var response struct {
+				var body struct {
 					Status  int    `json:"status"`
 					Message string `json:"message"`
 					Data    struct {
-						User  UserPayload `json:"user"`
-						Token string      `json:"token"`
+						User  response.UserPayload `json:"user"`
+						Token string               `json:"token"`
 					} `json:"data"`
 				}
-				if err := json.Unmarshal(resp.Body.Bytes(), &response); err != nil {
+				if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 					t.Fatalf("body bukan JSON: %v", err)
 				}
-				if response.Status != http.StatusCreated {
-					t.Errorf("status = %d, ingin %d", response.Status, http.StatusCreated)
+				if body.Status != http.StatusCreated {
+					t.Errorf("status = %d, ingin %d", body.Status, http.StatusCreated)
 				}
-				if response.Data.Token != "jwt" || response.Data.User.Identifier != "test@gmail.com" {
-					t.Errorf("response = %+v", response)
+				if body.Data.Token != "jwt" || body.Data.User.Identifier != "test@gmail.com" {
+					t.Errorf("response = %+v", body)
 				}
 			}
 		})
@@ -105,8 +110,8 @@ func TestRegister(t *testing.T) {
 func TestLogin(t *testing.T) {
 	t.Run("berhasil", func(t *testing.T) {
 		_, api := humatest.New(t)
-		svc := &fakeAuthService{result: Result{User: User{Name: "Kicau Mania", Identifier: "test@gmail.com"}, Token: "jwt"}}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		svc := &fakeAuthService{result: entities.AuthResult{User: entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}, Token: "jwt"}}
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
 		resp := api.Post("/api/v1/auth/login", strings.NewReader(`{"identifier":"test@gmail.com","password":"test123@"}`))
@@ -117,8 +122,8 @@ func TestLogin(t *testing.T) {
 
 	t.Run("kredensial salah", func(t *testing.T) {
 		_, api := humatest.New(t)
-		svc := &fakeAuthService{err: ErrInvalidCredentials}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		svc := &fakeAuthService{err: apperrors.ErrInvalidCredentials}
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
 		resp := api.Post("/api/v1/auth/login", strings.NewReader(`{"identifier":"test@gmail.com","password":"salah"}`))
@@ -130,7 +135,7 @@ func TestLogin(t *testing.T) {
 	t.Run("json rusak", func(t *testing.T) {
 		_, api := humatest.New(t)
 		svc := &fakeAuthService{}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
 		resp := api.Post("/api/v1/auth/login", strings.NewReader(`{`))
@@ -143,10 +148,10 @@ func TestLogin(t *testing.T) {
 func TestLogout(t *testing.T) {
 	_, api := humatest.New(t)
 	svc := &fakeAuthService{}
-	tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+	tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 	RegisterRoutes(api, svc, tokens)
 
-	token, _ := tokens.Issue(User{Name: "Kicau Mania", Identifier: "test@gmail.com"})
+	token, _ := tokens.Issue("test@gmail.com", "Kicau Mania")
 	resp := api.Post("/api/v1/auth/logout", "Authorization: Bearer "+token)
 	if resp.Code != http.StatusNoContent {
 		t.Errorf("status = %d, ingin 204; body=%s", resp.Code, resp.Body.String())
@@ -156,35 +161,35 @@ func TestLogout(t *testing.T) {
 func TestMe(t *testing.T) {
 	t.Run("berhasil", func(t *testing.T) {
 		_, api := humatest.New(t)
-		svc := &fakeAuthService{profile: User{Name: "Kicau Mania", Identifier: "test@gmail.com"}}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		svc := &fakeAuthService{profile: entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}}
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
-		token, _ := tokens.Issue(User{Name: "Kicau Mania", Identifier: "test@gmail.com"})
+		token, _ := tokens.Issue("test@gmail.com", "Kicau Mania")
 		resp := api.Get("/api/v1/auth/me", "Authorization: Bearer "+token)
 		if resp.Code != http.StatusOK {
 			t.Fatalf("status = %d, ingin 200; body=%s", resp.Code, resp.Body.String())
 		}
-		var response struct {
-			Status  int         `json:"status"`
-			Message string      `json:"message"`
-			Data    UserPayload `json:"data"`
+		var body struct {
+			Status  int                  `json:"status"`
+			Message string               `json:"message"`
+			Data    response.UserPayload `json:"data"`
 		}
-		if err := json.Unmarshal(resp.Body.Bytes(), &response); err != nil {
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 			t.Fatal(err)
 		}
-		if response.Status != http.StatusOK {
-			t.Errorf("status = %d, ingin %d", response.Status, http.StatusOK)
+		if body.Status != http.StatusOK {
+			t.Errorf("status = %d, ingin %d", body.Status, http.StatusOK)
 		}
-		if response.Data.Name != "Kicau Mania" {
-			t.Errorf("response = %+v", response)
+		if body.Data.Name != "Kicau Mania" {
+			t.Errorf("response = %+v", body)
 		}
 	})
 
 	t.Run("tanpa token", func(t *testing.T) {
 		_, api := humatest.New(t)
 		svc := &fakeAuthService{}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
 		resp := api.Get("/api/v1/auth/me")
@@ -196,10 +201,10 @@ func TestMe(t *testing.T) {
 	t.Run("profil gagal", func(t *testing.T) {
 		_, api := humatest.New(t)
 		svc := &fakeAuthService{profileErr: errors.New("db down")}
-		tokens := NewTokenManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
+		tokens := jwt.NewManager([]byte("rahasia-untuk-test"), 24*3600*1000000000)
 		RegisterRoutes(api, svc, tokens)
 
-		token, _ := tokens.Issue(User{Name: "Kicau Mania", Identifier: "test@gmail.com"})
+		token, _ := tokens.Issue("test@gmail.com", "Kicau Mania")
 		resp := api.Get("/api/v1/auth/me", "Authorization: Bearer "+token)
 		if resp.Code != http.StatusInternalServerError {
 			t.Errorf("status = %d, ingin 500", resp.Code)

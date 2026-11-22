@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/Junx27/kicaugo-backend/internal/entities"
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
 func TestServiceRegister(t *testing.T) {
@@ -32,7 +35,7 @@ func TestServiceRegister(t *testing.T) {
 
 	t.Run("payload invalid", func(t *testing.T) {
 		service, _ := newTestService(newFakeRepository())
-		if _, err := service.Register(context.Background(), "Kicau Mania", "test@gmail.com", "pendek"); err != ErrInvalidPayload {
+		if _, err := service.Register(context.Background(), "Kicau Mania", "test@gmail.com", "pendek"); err != apperrors.ErrInvalidPayload {
 			t.Errorf("Register() error = %v, ingin ErrInvalidPayload", err)
 		}
 	})
@@ -45,7 +48,7 @@ func TestServiceRegister(t *testing.T) {
 		}
 
 		_, err := service.Register(context.Background(), "Kicau Lain", "test@gmail.com", "test123@")
-		if !errors.Is(err, ErrIdentifierTaken) {
+		if !errors.Is(err, apperrors.ErrIdentifierTaken) {
 			t.Errorf("Register() error = %v, ingin ErrIdentifierTaken", err)
 		}
 	})
@@ -67,7 +70,7 @@ func TestServiceRegister(t *testing.T) {
 
 func TestServiceLogin(t *testing.T) {
 	repo := newFakeRepository()
-	repo.users["test@gmail.com"] = User{
+	repo.users["test@gmail.com"] = entities.User{
 		Name:         "Kicau Mania",
 		Identifier:   "test@gmail.com",
 		PasswordHash: hashPassword(t, "test123@"),
@@ -85,13 +88,13 @@ func TestServiceLogin(t *testing.T) {
 	})
 
 	t.Run("password salah", func(t *testing.T) {
-		if _, err := service.Login(context.Background(), "test@gmail.com", "salah123@"); err != ErrInvalidCredentials {
+		if _, err := service.Login(context.Background(), "test@gmail.com", "salah123@"); err != apperrors.ErrInvalidCredentials {
 			t.Errorf("Login() error = %v, ingin ErrInvalidCredentials", err)
 		}
 	})
 
 	t.Run("pengguna tidak ada", func(t *testing.T) {
-		if _, err := service.Login(context.Background(), "tidak@gmail.com", "test123@"); err != ErrInvalidCredentials {
+		if _, err := service.Login(context.Background(), "tidak@gmail.com", "test123@"); err != apperrors.ErrInvalidCredentials {
 			t.Errorf("Login() error = %v, ingin ErrInvalidCredentials", err)
 		}
 	})
@@ -114,7 +117,7 @@ func TestServiceLogin(t *testing.T) {
 
 func TestServiceProfile(t *testing.T) {
 	repo := newFakeRepository()
-	repo.users["test@gmail.com"] = User{Name: "Kicau Mania", Identifier: "test@gmail.com"}
+	repo.users["test@gmail.com"] = entities.User{Name: "Kicau Mania", Identifier: "test@gmail.com"}
 	service, _ := newTestService(repo)
 
 	user, err := service.Profile(context.Background(), "test@gmail.com")

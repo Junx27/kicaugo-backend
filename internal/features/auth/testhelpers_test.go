@@ -7,26 +7,30 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/Junx27/kicaugo-backend/internal/entities"
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 )
 
 type fakeRepository struct {
-	users     map[string]User
+	users     map[string]entities.User
 	createErr error
 	findErr   error
 }
 
 func newFakeRepository() *fakeRepository {
-	return &fakeRepository{users: make(map[string]User)}
+	return &fakeRepository{users: make(map[string]entities.User)}
 }
 
-func (f *fakeRepository) Create(_ context.Context, name, identifier, passwordHash string) (User, error) {
+func (f *fakeRepository) Create(_ context.Context, name, identifier, passwordHash string) (entities.User, error) {
 	if f.createErr != nil {
-		return User{}, f.createErr
+		return entities.User{}, f.createErr
 	}
 	if _, exists := f.users[identifier]; exists {
-		return User{}, ErrIdentifierTaken
+		return entities.User{}, apperrors.ErrIdentifierTaken
 	}
-	user := User{
+	user := entities.User{
 		ID:           int64(len(f.users) + 1),
 		Name:         name,
 		Identifier:   identifier,
@@ -36,29 +40,29 @@ func (f *fakeRepository) Create(_ context.Context, name, identifier, passwordHas
 	return user, nil
 }
 
-func (f *fakeRepository) FindByIdentifier(_ context.Context, identifier string) (User, error) {
+func (f *fakeRepository) FindByIdentifier(_ context.Context, identifier string) (entities.User, error) {
 	if f.findErr != nil {
-		return User{}, f.findErr
+		return entities.User{}, f.findErr
 	}
 	user, exists := f.users[identifier]
 	if !exists {
-		return User{}, ErrNotFound
+		return entities.User{}, apperrors.ErrNotFound
 	}
 	return user, nil
 }
 
-func newTestTokenManager() *TokenManager {
-	return NewTokenManager([]byte("rahasia-untuk-test"), time.Hour)
+func newTestTokenManager() *jwt.Manager {
+	return jwt.NewManager([]byte("rahasia-untuk-test"), time.Hour)
 }
 
-func newTestService(repo Repository) (*Service, *TokenManager) {
+func newTestService(repo Repository) (*Service, *jwt.Manager) {
 	tokens := newTestTokenManager()
 	return NewService(repo, tokens), tokens
 }
 
 type failingIssuer struct{}
 
-func (failingIssuer) Issue(User) (string, error) {
+func (failingIssuer) Issue(string, string) (string, error) {
 	return "", errors.New("issuer down")
 }
 
