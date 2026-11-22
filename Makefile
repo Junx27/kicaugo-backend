@@ -61,7 +61,7 @@ clean:
 # Usage: make scaffold NAME=<domain> FIELDS="Name:string,Price:int"
 scaffold:
 	@if [ -z "$(NAME)" ]; then echo "Usage: make scaffold NAME=<domain> FIELDS=\"Name:string,Price:int\""; exit 1; fi
-	go run ./cmd/scaffold -name=$(NAME) -fields="$(FIELDS)"
+	go run ./cmd/scaffold -name=$(NAME) -fields="$(FIELDS)" -ops="$(OPS)"
 
 # Migration, Index & Seeder Generator
 # Usage: make migration NAME=create_users_table

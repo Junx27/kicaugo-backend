@@ -2,17 +2,17 @@ package {{.Domain}}
 
 import (
 	"context"
-
-	"github.com/Junx27/kicaugo-backend/internal/entities"
-)
+{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/entities"
+{{end}})
 
 // Service adalah kontrak service {{.Domain}}.
 type Service interface {
-	List(ctx context.Context) ([]entities.{{.DomainPascal}}, error)
-	GetByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error)
-	Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
-	Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
-	Delete(ctx context.Context, id int64) error
+{{if .Ops.list}}	List(ctx context.Context) ([]entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.get}}	GetByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.create}}	Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.update}}	Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.delete}}	Delete(ctx context.Context, id int64) error
+{{end}}// scaffold:service-interface
 }
 
 // service adalah implementasi Service.
@@ -25,27 +25,29 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
-// List mengambil semua {{.Domain}}.
+{{if .Ops.list}}// List mengambil semua {{.Domain}}.
 func (s *service) List(ctx context.Context) ([]entities.{{.DomainPascal}}, error) {
 	return s.repo.List(ctx)
 }
 
-// GetByID mengambil {{.Domain}} berdasarkan id.
+{{end}}{{if .Ops.get}}// GetByID mengambil {{.Domain}} berdasarkan id.
 func (s *service) GetByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error) {
 	return s.repo.FindByID(ctx, id)
 }
 
-// Create membuat {{.Domain}} baru.
+{{end}}{{if .Ops.create}}// Create membuat {{.Domain}} baru.
 func (s *service) Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
 	return s.repo.Create(ctx, in)
 }
 
-// Update memperbarui {{.Domain}}.
+{{end}}{{if .Ops.update}}// Update memperbarui {{.Domain}}.
 func (s *service) Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
 	return s.repo.Update(ctx, id, in)
 }
 
-// Delete menghapus {{.Domain}}.
+{{end}}{{if .Ops.delete}}// Delete menghapus {{.Domain}}.
 func (s *service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
+
+{{end}}// scaffold:service-methods

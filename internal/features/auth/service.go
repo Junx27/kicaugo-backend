@@ -79,3 +79,5 @@ func (s *Service) issue(user entities.User) (entities.AuthResult, error) {
 func normalizeIdentifier(identifier string) string {
 	return strings.ToLower(strings.TrimSpace(identifier))
 }
+
+// scaffold:service-methods

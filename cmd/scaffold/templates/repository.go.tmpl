@@ -2,23 +2,23 @@ package {{.Domain}}
 
 import (
 	"context"
-	"errors"
 	"fmt"
+{{if or .Ops.get .Ops.update}}	"errors"
+{{end}}{{if or .Ops.get .Ops.update}}	"github.com/jackc/pgx/v5"
+{{end}}	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/Junx27/kicaugo-backend/internal/entities"
-	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
-)
+{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/entities"
+{{end}}{{if or .Ops.get .Ops.update .Ops.delete}}	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+{{end}})
 
 // Repository menyimpan dan mencari {{.Domain}}.
 type Repository interface {
-	List(ctx context.Context) ([]entities.{{.DomainPascal}}, error)
-	FindByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error)
-	Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
-	Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
-	Delete(ctx context.Context, id int64) error
+{{if .Ops.list}}	List(ctx context.Context) ([]entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.get}}	FindByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.create}}	Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.update}}	Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+{{end}}{{if .Ops.delete}}	Delete(ctx context.Context, id int64) error
+{{end}}// scaffold:repo-interface
 }
 
 // repository adalah implementasi Repository berbasis pgxpool.
@@ -31,7 +31,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 	return &repository{pool: pool}
 }
 
-// List mengambil semua {{.Domain}}.
+{{if .Ops.list}}// List mengambil semua {{.Domain}}.
 func (r *repository) List(ctx context.Context) ([]entities.{{.DomainPascal}}, error) {
 	const query = `SELECT id, {{.FieldColumns}}, created_at FROM {{.Table}} ORDER BY id`
 	rows, err := r.pool.Query(ctx, query)
@@ -54,7 +54,7 @@ func (r *repository) List(ctx context.Context) ([]entities.{{.DomainPascal}}, er
 	return out, nil
 }
 
-// FindByID mencari {{.Domain}} berdasarkan id.
+{{end}}{{if .Ops.get}}// FindByID mencari {{.Domain}} berdasarkan id.
 func (r *repository) FindByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error) {
 	const query = `SELECT id, {{.FieldColumns}}, created_at FROM {{.Table}} WHERE id = $1`
 	var c entities.{{.DomainPascal}}
@@ -69,7 +69,7 @@ func (r *repository) FindByID(ctx context.Context, id int64) (entities.{{.Domain
 	return c, nil
 }
 
-// Create menyimpan {{.Domain}} baru.
+{{end}}{{if .Ops.create}}// Create menyimpan {{.Domain}} baru.
 func (r *repository) Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
 	const query = `INSERT INTO {{.Table}} ({{.FieldColumns}}) VALUES ({{range $i, $f := .Fields}}${{add $i 1}}{{if (lt (add $i 1) (len $.Fields))}}, {{end}}{{end}}) RETURNING id, {{.FieldColumns}}, created_at`
 	var c entities.{{.DomainPascal}}
@@ -81,7 +81,7 @@ func (r *repository) Create(ctx context.Context, in entities.{{.DomainPascal}}) 
 	return c, nil
 }
 
-// Update memperbarui {{.Domain}}.
+{{end}}{{if .Ops.update}}// Update memperbarui {{.Domain}}.
 func (r *repository) Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
 	const query = `UPDATE {{.Table}} SET {{range $i, $f := .Fields}}{{$f.JSONTag}} = ${{add $i 1}}{{if (lt (add $i 1) (len $.Fields))}}, {{end}}{{end}} WHERE id = ${{add (len .Fields) 1}} RETURNING id, {{.FieldColumns}}, created_at`
 	var c entities.{{.DomainPascal}}
@@ -96,7 +96,7 @@ func (r *repository) Update(ctx context.Context, id int64, in entities.{{.Domain
 	return c, nil
 }
 
-// Delete menghapus {{.Domain}}.
+{{end}}{{if .Ops.delete}}// Delete menghapus {{.Domain}}.
 func (r *repository) Delete(ctx context.Context, id int64) error {
 	const query = `DELETE FROM {{.Table}} WHERE id = $1`
 	tag, err := r.pool.Exec(ctx, query, id)
@@ -108,3 +108,5 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+{{end}}// scaffold:repo-methods

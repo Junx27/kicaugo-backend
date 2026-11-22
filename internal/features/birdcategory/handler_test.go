@@ -64,3 +64,7 @@ func TestMapServiceError(t *testing.T) {
 		t.Error("mapServiceError() ingin error")
 	}
 }
+
+func (f *fakeService) Delete(ctx context.Context, id int64) error {
+	return nil
+}

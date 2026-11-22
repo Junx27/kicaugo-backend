@@ -7,11 +7,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
 // Repository menyimpan dan mencari kategori burung.
 type Repository interface {
 	List(ctx context.Context) ([]entities.BirdCategory, error)
+	Delete(ctx context.Context, id int64) error
+
+	// scaffold:repo-interface
 }
 
 // repository adalah implementasi Repository berbasis pgxpool.
@@ -46,3 +50,18 @@ func (r *repository) List(ctx context.Context) ([]entities.BirdCategory, error) 
 	}
 	return out, nil
 }
+
+// Delete menghapus birdcategory.
+func (r *repository) Delete(ctx context.Context, id int64) error {
+	const query = `DELETE FROM birdcategory WHERE id = $1`
+	tag, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete birdcategory %d: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperrors.ErrNotFound
+	}
+	return nil
+}
+
+// scaffold:repo-methods

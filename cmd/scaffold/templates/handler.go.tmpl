@@ -5,34 +5,36 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Junx27/kicaugo-backend/internal/entities"
-	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/entities"
+{{end}}	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
-	"github.com/Junx27/kicaugo-backend/internal/utils/request"
-	"github.com/Junx27/kicaugo-backend/internal/utils/response"
-)
+{{if or .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/utils/request"
+{{end}}{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/utils/response"
+{{end}})
 
-func toPayload(c entities.{{.DomainPascal}}) response.{{.DomainPascal}}Payload {
+{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}func toPayload(c entities.{{.DomainPascal}}) response.{{.DomainPascal}}Payload {
 	p := response.{{.DomainPascal}}Payload{ID: c.ID}
 {{range .Fields}}	p.{{.GoName}} = c.{{.GoName}}
 {{end}}	return p
 }
 
-func toEntity(input *request.Create{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
+{{end}}
+
+{{if .Ops.create}}func toEntity(input *request.Create{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
 	e := entities.{{.DomainPascal}}{}
 {{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
 {{end}}	return e
 }
 
-func toEntityUpdate(input *request.Update{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
+{{end}}{{if .Ops.update}}func toEntityUpdate(input *request.Update{{.DomainPascal}}Input) entities.{{.DomainPascal}} {
 	e := entities.{{.DomainPascal}}{}
 {{range .Fields}}	e.{{.GoName}} = input.Body.{{.GoName}}
 {{end}}	return e
 }
 
-// RegisterRoutes mendaftarkan route {{.Domain}} ke Huma API.
+{{end}}// RegisterRoutes mendaftarkan route {{.Domain}} ke Huma API.
 func RegisterRoutes(api apphttp.API, service Service) {
-	// GET /api/v1/{{.Domain}}s
+{{if .Ops.list}}	// GET /api/v1/{{.Domain}}s
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "list{{.DomainPascal}}s",
 		Method:  http.MethodGet,
@@ -54,7 +56,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		return resp, nil
 	})
 
-	// GET /api/v1/{{.Domain}}s/{id}
+{{end}}{{if .Ops.get}}	// GET /api/v1/{{.Domain}}s/{id}
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "get{{.DomainPascal}}",
 		Method:  http.MethodGet,
@@ -74,7 +76,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		return resp, nil
 	})
 
-	// POST /api/v1/{{.Domain}}s
+{{end}}{{if .Ops.create}}	// POST /api/v1/{{.Domain}}s
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "create{{.DomainPascal}}",
 		Method:  http.MethodPost,
@@ -92,7 +94,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		return resp, nil
 	})
 
-	// PUT /api/v1/{{.Domain}}s/{id}
+{{end}}{{if .Ops.update}}	// PUT /api/v1/{{.Domain}}s/{id}
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "update{{.DomainPascal}}",
 		Method:  http.MethodPut,
@@ -110,7 +112,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		return resp, nil
 	})
 
-	// DELETE /api/v1/{{.Domain}}s/{id}
+{{end}}{{if .Ops.delete}}	// DELETE /api/v1/{{.Domain}}s/{id}
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "delete{{.DomainPascal}}",
 		Method:  http.MethodDelete,
@@ -127,6 +129,8 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		resp.Status = http.StatusNoContent
 		return resp, nil
 	})
+
+{{end}}	// scaffold:routes
 }
 
 func mapServiceError(err error) error {

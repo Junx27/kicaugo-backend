@@ -97,6 +97,7 @@ func RegisterRoutes(api apphttp.API, service AuthService, tokens *jwt.Manager) {
 		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded successfully", toPayload(result))
 		return resp, nil
 	})
+	// scaffold:routes
 }
 
 func toPayload(user entities.User) response.UserPayload {

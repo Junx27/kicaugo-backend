@@ -6,31 +6,33 @@ type {{.DomainPascal}}Payload struct {
 {{range .Fields}}	{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}"`
 {{end}}}
 
-// {{.DomainPascal}}ListOutput adalah output untuk GET list.
+{{if .Ops.list}}// {{.DomainPascal}}ListOutput adalah output untuk GET list.
 type {{.DomainPascal}}ListOutput struct {
 	Status int `status:"200"`
 	Body   Success[[]{{.DomainPascal}}Payload]
 }
 
-// {{.DomainPascal}}GetOutput adalah output untuk GET by id.
+{{end}}{{if .Ops.get}}// {{.DomainPascal}}GetOutput adalah output untuk GET by id.
 type {{.DomainPascal}}GetOutput struct {
 	Status int `status:"200"`
 	Body   Success[{{.DomainPascal}}Payload]
 }
 
-// {{.DomainPascal}}CreateOutput adalah output untuk POST.
+{{end}}{{if .Ops.create}}// {{.DomainPascal}}CreateOutput adalah output untuk POST.
 type {{.DomainPascal}}CreateOutput struct {
 	Status int `status:"201"`
 	Body   Success[{{.DomainPascal}}Payload]
 }
 
-// {{.DomainPascal}}UpdateOutput adalah output untuk PUT.
+{{end}}{{if .Ops.update}}// {{.DomainPascal}}UpdateOutput adalah output untuk PUT.
 type {{.DomainPascal}}UpdateOutput struct {
 	Status int `status:"200"`
 	Body   Success[{{.DomainPascal}}Payload]
 }
 
-// {{.DomainPascal}}DeleteOutput adalah output untuk DELETE.
+{{end}}{{if .Ops.delete}}// {{.DomainPascal}}DeleteOutput adalah output untuk DELETE.
 type {{.DomainPascal}}DeleteOutput struct {
 	Status int `status:"204"`
 }
+
+{{end}}// scaffold:response-types

@@ -19,6 +19,7 @@ const uniqueViolation = "23505"
 type Repository interface {
 	Create(ctx context.Context, name, identifier, passwordHash string) (entities.User, error)
 	FindByIdentifier(ctx context.Context, identifier string) (entities.User, error)
+	// scaffold:repo-interface
 }
 
 // repository adalah implementasi Repository berbasis pgxpool.
@@ -61,3 +62,5 @@ func (r *repository) FindByIdentifier(ctx context.Context, identifier string) (e
 	}
 	return user, nil
 }
+
+// scaffold:repo-methods
