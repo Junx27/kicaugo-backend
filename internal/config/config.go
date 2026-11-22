@@ -100,10 +100,6 @@ func Load() (Config, error) {
 	}, nil
 }
 
-func (c *Config) ParsedPoolConfig() (maxConns, minConns int32, maxConnLife, maxConnIdle, healthCheck, tokenTTL time.Duration) {
-	return c.Pool.MaxConns, c.Pool.MinConns, c.Pool.MaxConnLifetime, c.Pool.MaxConnIdleTime, c.Pool.HealthCheckPeriod, c.TokenTTL
-}
-
 func parseIntEnv(key string, defaultVal int) int {
 	val := os.Getenv(key)
 	if val == "" {
