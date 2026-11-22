@@ -466,6 +466,7 @@ func augmentDelete(domain, domainPascal string, d data) error {
 	repoPath := filepath.Join("internal", "features", domain, "repository.go")
 	servicePath := filepath.Join("internal", "features", domain, "service.go")
 	handlerPath := filepath.Join("internal", "features", domain, "handler.go")
+	respPath := filepath.Join("internal", "utils", "response", domain+".go")
 
 	// Pastikan import yang dibutuhkan ada sebelum menyisipkan kode yang memakainya.
 	if b, err := os.ReadFile(repoPath); err == nil {
@@ -496,11 +497,23 @@ func augmentDelete(domain, domainPascal string, d data) error {
 			}
 			c = strings.Join(lines, "\n")
 		}
+		if !strings.Contains(c, "utils/response") {
+			lines := strings.Split(c, "\n")
+			for i, l := range lines {
+				if strings.Contains(l, "internal/utils/http") {
+					lines[i] = l + "\n\t\"github.com/Junx27/kicaugo-backend/internal/utils/response\""
+					break
+				}
+			}
+			c = strings.Join(lines, "\n")
+		}
 		os.WriteFile(handlerPath, []byte(c), 0644)
 	}
 
-	// Repository interface + impl
-	repoSnippet := `
+	// Repository interface + impl (idempotent)
+	if !strings.Contains(mustRead(repoPath), "func (r *repository) Delete") {
+		repoIfaceSnippet := "\tDelete(ctx context.Context, id int64) error\n"
+		repoSnippet := `
 // Delete menghapus {{.Domain}}.
 func (r *repository) Delete(ctx context.Context, id int64) error {
 	const query = ` + "`DELETE FROM {{.Table}} WHERE id = $1`" + `
@@ -514,46 +527,52 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 `
-	// interface method snippet
-	repoIfaceSnippet := "\tDelete(ctx context.Context, id int64) error\n"
-
-	if err := insertBeforeMarker(repoPath, "// scaffold:repo-interface", repoIfaceSnippet, domain, domainPascal); err != nil {
-		return err
-	}
-	if err := insertBeforeMarker(repoPath, "// scaffold:repo-methods", repoSnippet, domain, domainPascal); err != nil {
-		return err
+		if err := insertBeforeMarker(repoPath, "// scaffold:repo-interface", repoIfaceSnippet, domain, domainPascal); err != nil {
+			return err
+		}
+		if err := insertBeforeMarker(repoPath, "// scaffold:repo-methods", repoSnippet, domain, domainPascal); err != nil {
+			return err
+		}
 	}
 
-	// Service interface + impl
-	serviceIfaceSnippet := "\tDelete(ctx context.Context, id int64) error\n"
-	serviceImplSnippet := `
+	// Service interface + impl (idempotent)
+	if !strings.Contains(mustRead(servicePath), "func (s *service) Delete") {
+		serviceIfaceSnippet := "\tDelete(ctx context.Context, id int64) error\n"
+		serviceImplSnippet := `
 // Delete menghapus {{.Domain}}.
 func (s *service) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 `
-	if err := insertBeforeMarker(servicePath, "// scaffold:service-interface", serviceIfaceSnippet, domain, domainPascal); err != nil {
-		return err
-	}
-	if err := insertBeforeMarker(servicePath, "// scaffold:service-methods", serviceImplSnippet, domain, domainPascal); err != nil {
-		return err
+		if err := insertBeforeMarker(servicePath, "// scaffold:service-interface", serviceIfaceSnippet, domain, domainPascal); err != nil {
+			return err
+		}
+		if err := insertBeforeMarker(servicePath, "// scaffold:service-methods", serviceImplSnippet, domain, domainPascal); err != nil {
+			return err
+		}
 	}
 
-	// Handler: DeleteOutput struct + route + mapServiceError
-	handlerPath2 := handlerPath
-	// insert DeleteOutput struct before RegisterRoutes
-	deleteOutputStruct := `
-// DeleteOutput adalah output untuk DELETE.
-type DeleteOutput struct {
+	// Response DTO (idempotent)
+	respPath2 := respPath
+	if _, err := os.Stat(respPath2); err == nil {
+		if !strings.Contains(mustRead(respPath2), "DeleteOutput") {
+			deleteOutputStruct := `
+// {{.DomainPascal}}DeleteOutput adalah output untuk DELETE.
+type {{.DomainPascal}}DeleteOutput struct {
 	Status int ` + "`" + `status:"204"` + "`" + `
 }
 
 `
-	if err := insertBeforeMarker(handlerPath2, "func RegisterRoutes", deleteOutputStruct, domain, domainPascal); err != nil {
-		return err
+			if err := insertBeforeMarker(respPath2, "// scaffold:response-types", deleteOutputStruct, domain, domainPascal); err != nil {
+				return err
+			}
+		}
 	}
 
-	deleteRoute := `
+	// Handler route (idempotent)
+	handlerPath2 := handlerPath
+	if !strings.Contains(mustRead(handlerPath2), "http.MethodDelete") {
+		deleteRoute := `
 	// DELETE /api/v1/{{.Domain}}s/{id}
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "delete{{.DomainPascal}}",
@@ -563,54 +582,50 @@ type DeleteOutput struct {
 		Tags:    []string{"{{.Domain}}"},
 	}, func(ctx context.Context, input *struct {
 		ID int64 ` + "`" + `path:"id"` + "`" + `
-	}) (*DeleteOutput, error) {
+	}) (*response.{{.DomainPascal}}DeleteOutput, error) {
 		if err := service.Delete(ctx, input.ID); err != nil {
 			return nil, mapServiceError(err)
 		}
-		resp := &DeleteOutput{}
+		resp := &response.{{.DomainPascal}}DeleteOutput{}
 		resp.Status = http.StatusNoContent
 		return resp, nil
 	})
 
 `
-	if err := insertBeforeMarker(handlerPath2, "// scaffold:routes", deleteRoute, domain, domainPascal); err != nil {
-		return err
+		if err := insertBeforeMarker(handlerPath2, "// scaffold:routes", deleteRoute, domain, domainPascal); err != nil {
+			return err
+		}
 	}
 
 	// update mapServiceError to handle ErrNotFound
-	oldMap := `func mapServiceError(err error) error {
+	b, err := os.ReadFile(handlerPath2)
+	if err == nil {
+		c := string(b)
+		oldMap := `func mapServiceError(err error) error {
 	return apphttp.InternalServerError("An error occurred. Please try again.")
 }`
-	newMap := `func mapServiceError(err error) error {
+		newMap := `func mapServiceError(err error) error {
 	if errors.Is(err, apperrors.ErrNotFound) {
 		return apphttp.NotFound("{{.DomainPascal}} not found")
 	}
 	return apphttp.InternalServerError("An error occurred. Please try again.")
 }`
-	b, err := os.ReadFile(handlerPath2)
-	if err != nil {
-		return err
-	}
-	content := string(b)
-	if !strings.Contains(content, oldMap) {
-		// maybe already updated; skip
-	} else {
-		content = strings.Replace(content, oldMap, newMap, 1)
-		// ensure imports: errors, apperrors already? birdcategory handler doesn't import errors/apperrors currently.
-		// Add imports if missing.
-		if !strings.Contains(content, "\"errors\"") {
-			content = strings.Replace(content, "import (\n\t\"context\"\n\t\"net/http\"", "import (\n\t\"context\"\n\t\"errors\"\n\t\"net/http\"", 1)
+		if strings.Contains(c, oldMap) {
+			c = strings.Replace(c, oldMap, newMap, 1)
 		}
-		if !strings.Contains(content, "apperrors \"github.com/Junx27/kicaugo-backend/internal/utils/errors\"") {
-			// add apperrors import after apphttp import line
-			content = strings.Replace(content, "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n", "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n\tapperrors \"github.com/Junx27/kicaugo-backend/internal/utils/errors\"\n", 1)
+		if !strings.Contains(c, "\"errors\"") {
+			c = strings.Replace(c, "import (\n\t\"context\"\n\t\"net/http\"", "import (\n\t\"context\"\n\t\"errors\"\n\t\"net/http\"", 1)
 		}
-		if err := os.WriteFile(handlerPath2, []byte(content), 0644); err != nil {
-			return err
+		if !strings.Contains(c, "apperrors \"github.com/Junx27/kicaugo-backend/internal/utils/errors\"") {
+			c = strings.Replace(c, "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n", "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n\tapperrors \"github.com/Junx27/kicaugo-backend/internal/utils/errors\"\n", 1)
 		}
+		if !strings.Contains(c, "github.com/Junx27/kicaugo-backend/internal/utils/response") {
+			c = strings.Replace(c, "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n", "\tapphttp \"github.com/Junx27/kicaugo-backend/internal/utils/http\"\n\t\"github.com/Junx27/kicaugo-backend/internal/utils/response\"\n", 1)
+		}
+		os.WriteFile(handlerPath2, []byte(c), 0644)
 	}
 
-	// Also need apperrors import in repository.go (already? birdcategory repository imports apperrors? No, after our earlier removal, birdcategory repository imports only pgxpool, entities. Need apperrors for ErrNotFound.)
+	// apperrors import in repository.go
 	repoBytes, _ := os.ReadFile(repoPath)
 	repoContent := string(repoBytes)
 	if !strings.Contains(repoContent, "apperrors") {
@@ -621,23 +636,17 @@ type DeleteOutput struct {
 	// Pastikan mock test mengimplementasikan Delete (agar go vet/test build).
 	testFiles := []struct {
 		path   string
+		needle string
 		method string
 	}{
-		{filepath.Join("internal", "features", domain, "repository_test.go"), "func (m *mockRepository) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
-		{filepath.Join("internal", "features", domain, "service_test.go"), "func (f *fakeRepository) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
-		{filepath.Join("internal", "features", domain, "handler_test.go"), "func (f *fakeService) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
+		{filepath.Join("internal", "features", domain, "repository_test.go"), "func (m *mockRepository) Delete", "func (m *mockRepository) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
+		{filepath.Join("internal", "features", domain, "service_test.go"), "func (f *fakeRepository) Delete", "func (f *fakeRepository) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
+		{filepath.Join("internal", "features", domain, "handler_test.go"), "func (f *fakeService) Delete", "func (f *fakeService) Delete(ctx context.Context, id int64) error {\n\treturn nil\n}\n"},
 	}
 	for _, tf := range testFiles {
 		if b, err := os.ReadFile(tf.path); err == nil {
 			c := string(b)
-			needle := "func (m *mockRepository) Delete"
-			if strings.Contains(tf.path, "service_test") {
-				needle = "func (f *fakeRepository) Delete"
-			}
-			if strings.Contains(tf.path, "handler_test") {
-				needle = "func (f *fakeService) Delete"
-			}
-			if !strings.Contains(c, needle) {
+			if !strings.Contains(c, tf.needle) {
 				c = c + "\n" + tf.method
 				os.WriteFile(tf.path, []byte(c), 0644)
 			}
@@ -645,6 +654,10 @@ type DeleteOutput struct {
 	}
 
 	return nil
+}
+func mustRead(path string) string {
+	b, _ := os.ReadFile(path)
+	return string(b)
 }
 
 func insertBeforeMarker(path, marker, snippet, domain, domainPascal string) error {
