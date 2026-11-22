@@ -96,3 +96,35 @@ func TestServiceGet(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceDummySections(t *testing.T) {
+	svc := NewService(&fakeProfileReader{}, &fakeEventReader{})
+
+	featured := svc.GetFeatured()
+	if featured.Title == "" || len(featured.Attendees.Initials) != 2 || featured.Attendees.Others != 48 {
+		t.Errorf("featured = %+v", featured)
+	}
+
+	upcoming := svc.GetUpcoming()
+	if upcoming.Title == "" || upcoming.RemainingTickets != 3 {
+		t.Errorf("upcoming = %+v", upcoming)
+	}
+
+	stats := svc.GetStats()
+	if stats.Badge != "100% Resmi" || stats.Headline == "" {
+		t.Errorf("stats = %+v", stats)
+	}
+
+	ticket := svc.GetActiveTicket()
+	if ticket.Number != "#G-18" || ticket.Session == "" {
+		t.Errorf("active ticket = %+v", ticket)
+	}
+
+	schedules := svc.GetSchedules()
+	if len(schedules) != 4 {
+		t.Fatalf("len(schedules) = %d, ingin 4", len(schedules))
+	}
+	if schedules[0].Status != "available" || schedules[0].Category.Name != "Cucak Hijau" {
+		t.Errorf("schedule[0] = %+v", schedules[0])
+	}
+}

@@ -20,10 +20,15 @@ import (
 )
 
 type fakeService struct {
-	view       View
-	err        error
-	identifier string
-	opts       Options
+	view         View
+	err          error
+	identifier   string
+	opts         Options
+	featured     Featured
+	upcoming     Upcoming
+	stats        Stats
+	activeTicket ActiveTicket
+	schedules    []Schedule
 }
 
 func (f *fakeService) Get(ctx context.Context, identifier string, opts Options) (View, error) {
@@ -31,6 +36,12 @@ func (f *fakeService) Get(ctx context.Context, identifier string, opts Options) 
 	f.opts = opts
 	return f.view, f.err
 }
+
+func (f *fakeService) GetFeatured() Featured         { return f.featured }
+func (f *fakeService) GetUpcoming() Upcoming         { return f.upcoming }
+func (f *fakeService) GetStats() Stats               { return f.stats }
+func (f *fakeService) GetActiveTicket() ActiveTicket { return f.activeTicket }
+func (f *fakeService) GetSchedules() []Schedule      { return f.schedules }
 
 func setupHandler(t *testing.T, svc Service) (humatest.TestAPI, *jwt.Manager) {
 	t.Helper()
@@ -238,5 +249,228 @@ func TestGetProfileHandlerTanpaIdentitas(t *testing.T) {
 	statusErr, ok := err.(interface{ GetStatus() int })
 	if err == nil || !ok || statusErr.GetStatus() != http.StatusUnauthorized {
 		t.Errorf("handler tanpa identitas = %v, ingin 401", err)
+	}
+}
+
+func sampleFeatured() Featured {
+	return Featured{
+		Title:     "Piala Raja Nusantara 2026",
+		Schedule:  "Minggu, 6 Des • Batavia Arena, Jaksel",
+		Distance:  "3.2 KM",
+		Prize:     "Rp 50 Jt",
+		Slots:     "12 Gantangan",
+		Attendees: FeaturedAttendees{Initials: []string{"MK", "BN"}, Others: 48},
+	}
+}
+
+func sampleUpcoming() Upcoming {
+	return Upcoming{Type: "Latber Presisi", Title: "Latber Presisi Kacer", Time: "Besok, 14:00 WIB", Price: "Rp 75.000", RemainingTickets: 3}
+}
+
+func sampleStats() Stats {
+	return Stats{Badge: "100% Resmi", Headline: "520+ Gantangan", Note: "Terverifikasi panitia & EO resmi.", SecurityNote: "98% Transaksi Tiket Instan & Aman"}
+}
+
+func sampleActiveTicket() ActiveTicket {
+	return ActiveTicket{Event: "Grand Prix Murai Batu VIP #18", Schedule: "Sabtu, 12 Des • Masterpiece Arena", Number: "#G-18", Session: "Sesi A - 16G"}
+}
+
+func sampleSchedules() []Schedule {
+	return []Schedule{{Title: "Latpres Exclusive Cucak Ijo", Venue: "Arena Master Cilandak, Jaksel", Date: "Selasa, 24 Nov", Price: "Rp 100rb", Status: "available", Category: ScheduleCategory{ID: 1, Name: "Cucak Hijau"}}}
+}
+
+func ptrString(v string) *string { return &v }
+
+func TestGetHomeFeaturedHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{featured: sampleFeatured()}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/featured", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    struct {
+				Title     string `json:"title"`
+				Attendees struct {
+					Initials []string `json:"initials"`
+					Others   int      `json:"others"`
+				} `json:"attendees"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home featured loaded" || body.Data.Title != "Piala Raja Nusantara 2026" || body.Data.Attendees.Others != 48 || len(body.Data.Attendees.Initials) != 2 {
+			t.Errorf("body = %+v", body)
+		}
+	})
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/featured"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
+func TestGetHomeUpcomingHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{upcoming: sampleUpcoming()}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/upcoming", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    struct {
+				RemainingTickets int    `json:"remaining_tickets"`
+				Title            string `json:"title"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home upcoming loaded" || body.Data.RemainingTickets != 3 || body.Data.Title != "Latber Presisi Kacer" {
+			t.Errorf("body = %+v", body)
+		}
+	})
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/upcoming"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
+func TestGetHomeStatsHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{stats: sampleStats()}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/stats", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    struct {
+				Badge        string `json:"badge"`
+				SecurityNote string `json:"security_note"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home stats loaded" || body.Data.Badge != "100% Resmi" || body.Data.SecurityNote == "" {
+			t.Errorf("body = %+v", body)
+		}
+	})
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/stats"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
+func TestGetHomeActiveTicketHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{activeTicket: sampleActiveTicket()}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/active-ticket", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    struct {
+				Number  string `json:"number"`
+				Session string `json:"session"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home active ticket loaded" || body.Data.Number != "#G-18" || body.Data.Session != "Sesi A - 16G" {
+			t.Errorf("body = %+v", body)
+		}
+	})
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/active-ticket"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
+func TestGetHomeSchedulesHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{schedules: sampleSchedules()}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/schedules", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    []struct {
+				Title    string `json:"title"`
+				Status   string `json:"status"`
+				Category struct {
+					ID   int64  `json:"id"`
+					Name string `json:"name"`
+				} `json:"category"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home schedules loaded" || len(body.Data) != 1 || body.Data[0].Status != "available" || body.Data[0].Category.Name != "Cucak Hijau" {
+			t.Errorf("body = %+v", body)
+		}
+	})
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/schedules"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
+func TestDummyHandlersTanpaIdentitas(t *testing.T) {
+	cases := []struct {
+		name string
+		fn   func() error
+	}{
+		{name: "featured", fn: func() error {
+			_, err := newGetFeaturedHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+		{name: "upcoming", fn: func() error {
+			_, err := newGetUpcomingHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+		{name: "stats", fn: func() error {
+			_, err := newGetStatsHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+		{name: "active ticket", fn: func() error {
+			_, err := newGetActiveTicketHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+		{name: "schedules", fn: func() error {
+			_, err := newGetSchedulesHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.fn()
+			statusErr, ok := err.(interface{ GetStatus() int })
+			if err == nil || !ok || statusErr.GetStatus() != http.StatusUnauthorized {
+				t.Errorf("err = %v, ingin 401", err)
+			}
+		})
 	}
 }

@@ -16,6 +16,11 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
+const (
+	homeTag                = "home"
+	bearerAuthSecurityName = "bearerAuth"
+)
+
 // toData memilih field profil yang aman untuk home dan menggabungkan data nearby.
 func toData(view View) response.HomeData {
 	profileData := profile.ToData(view.Profile)
@@ -37,6 +42,66 @@ func toData(view View) response.HomeData {
 	}
 }
 
+func toFeaturedData(data Featured) response.HomeFeaturedData {
+	return response.HomeFeaturedData{
+		Title:    data.Title,
+		Schedule: data.Schedule,
+		Distance: data.Distance,
+		Prize:    data.Prize,
+		Slots:    data.Slots,
+		Attendees: response.FeaturedAttendeesData{
+			Initials: data.Attendees.Initials,
+			Others:   data.Attendees.Others,
+		},
+	}
+}
+
+func toUpcomingData(data Upcoming) response.HomeUpcomingData {
+	return response.HomeUpcomingData{
+		Type:             data.Type,
+		Title:            data.Title,
+		Time:             data.Time,
+		Price:            data.Price,
+		RemainingTickets: data.RemainingTickets,
+	}
+}
+
+func toStatsData(data Stats) response.HomeStatsData {
+	return response.HomeStatsData{
+		Badge:        data.Badge,
+		Headline:     data.Headline,
+		Note:         data.Note,
+		SecurityNote: data.SecurityNote,
+	}
+}
+
+func toActiveTicketData(data ActiveTicket) response.HomeActiveTicketData {
+	return response.HomeActiveTicketData{
+		Event:    data.Event,
+		Schedule: data.Schedule,
+		Number:   data.Number,
+		Session:  data.Session,
+	}
+}
+
+func toSchedulesData(items []Schedule) []response.HomeScheduleData {
+	data := make([]response.HomeScheduleData, 0, len(items))
+	for _, item := range items {
+		data = append(data, response.HomeScheduleData{
+			Title:  item.Title,
+			Venue:  item.Venue,
+			Date:   item.Date,
+			Price:  item.Price,
+			Status: item.Status,
+			Category: response.HomeScheduleCategoryData{
+				ID:   item.Category.ID,
+				Name: item.Category.Name,
+			},
+		})
+	}
+	return data
+}
+
 // newGetProfileHandler membentuk handler agar dapat diuji langsung tanpa Huma.
 func newGetProfileHandler(service Service) func(context.Context, *request.HomeProfileInput) (*response.HomeOutput, error) {
 	return func(ctx context.Context, input *request.HomeProfileInput) (*response.HomeOutput, error) {
@@ -56,21 +121,130 @@ func newGetProfileHandler(service Service) func(context.Context, *request.HomePr
 	}
 }
 
+func newGetFeaturedHandler(service Service) func(context.Context, *struct{}) (*response.HomeFeaturedOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeFeaturedOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		resp := &response.HomeFeaturedOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home featured loaded", toFeaturedData(service.GetFeatured()))
+		return resp, nil
+	}
+}
+
+func newGetUpcomingHandler(service Service) func(context.Context, *struct{}) (*response.HomeUpcomingOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeUpcomingOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		resp := &response.HomeUpcomingOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home upcoming loaded", toUpcomingData(service.GetUpcoming()))
+		return resp, nil
+	}
+}
+
+func newGetStatsHandler(service Service) func(context.Context, *struct{}) (*response.HomeStatsOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeStatsOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		resp := &response.HomeStatsOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home stats loaded", toStatsData(service.GetStats()))
+		return resp, nil
+	}
+}
+
+func newGetActiveTicketHandler(service Service) func(context.Context, *struct{}) (*response.HomeActiveTicketOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeActiveTicketOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		resp := &response.HomeActiveTicketOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home active ticket loaded", toActiveTicketData(service.GetActiveTicket()))
+		return resp, nil
+	}
+}
+
+func newGetSchedulesHandler(service Service) func(context.Context, *struct{}) (*response.HomeSchedulesOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeSchedulesOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		resp := &response.HomeSchedulesOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home schedules loaded", toSchedulesData(service.GetSchedules()))
+		return resp, nil
+	}
+}
+
 // RegisterRoutes mendaftarkan route home ke Huma API.
 func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
+	auth := []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)}
+	security := []map[string][]string{{bearerAuthSecurityName: {}}}
+
 	apphttp.Register(api, apphttp.Operation{
-		ID:      "getHomeProfile",
-		Method:  http.MethodGet,
-		Path:    "/api/v1/home/profile",
-		Summary: "Get Home Profile",
-		Tags:    []string{"home"},
-		Security: []map[string][]string{
-			{"bearerAuth": {}},
-		},
-		Middlewares: []apphttp.Middleware{
-			middlewares.AuthMiddleware[jwt.Claims](tokens),
-		},
+		ID:          "getHomeProfile",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/profile",
+		Summary:     "Get Home Profile",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
 	}, newGetProfileHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeFeatured",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/featured",
+		Summary:     "Get Home Featured",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetFeaturedHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeUpcoming",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/upcoming",
+		Summary:     "Get Home Upcoming",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetUpcomingHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeStats",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/stats",
+		Summary:     "Get Home Stats",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetStatsHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeActiveTicket",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/active-ticket",
+		Summary:     "Get Home Active Ticket",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetActiveTicketHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeSchedules",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/schedules",
+		Summary:     "Get Home Schedules",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetSchedulesHandler(service))
 }
 
 // mapServiceError memetakan error domain ke status HTTP.

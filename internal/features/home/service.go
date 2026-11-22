@@ -35,9 +35,71 @@ type View struct {
 	OngoingEventsCount int
 }
 
+// Featured adalah data demo featured contest Beranda.
+type Featured struct {
+	Title     string
+	Schedule  string
+	Distance  string
+	Prize     string
+	Slots     string
+	Attendees FeaturedAttendees
+}
+
+// FeaturedAttendees adalah ringkasan peserta featured contest.
+type FeaturedAttendees struct {
+	Initials []string
+	Others   int
+}
+
+// Upcoming adalah data demo upcoming contest Beranda.
+type Upcoming struct {
+	Type             string
+	Title            string
+	Time             string
+	Price            string
+	RemainingTickets int
+}
+
+// Stats adalah data demo statistik Beranda.
+type Stats struct {
+	Badge        string
+	Headline     string
+	Note         string
+	SecurityNote string
+}
+
+// ActiveTicket adalah data demo tiket aktif Beranda.
+type ActiveTicket struct {
+	Event    string
+	Schedule string
+	Number   string
+	Session  string
+}
+
+// ScheduleCategory adalah kategori burung pada jadwal Beranda.
+type ScheduleCategory struct {
+	ID   int64
+	Name string
+}
+
+// Schedule adalah data demo item jadwal Beranda.
+type Schedule struct {
+	Title    string
+	Venue    string
+	Date     string
+	Price    string
+	Status   string
+	Category ScheduleCategory
+}
+
 // Service menyediakan data halaman home.
 type Service interface {
 	Get(ctx context.Context, identifier string, opts Options) (View, error)
+	GetFeatured() Featured
+	GetUpcoming() Upcoming
+	GetStats() Stats
+	GetActiveTicket() ActiveTicket
+	GetSchedules() []Schedule
 }
 
 // service adalah implementasi Service yang mengorkestrasi service existing.
@@ -77,4 +139,115 @@ func (s *service) Get(ctx context.Context, identifier string, opts Options) (Vie
 		Greeting:           greeting(s.now()),
 		OngoingEventsCount: count,
 	}, nil
+}
+
+func (s *service) GetFeatured() Featured {
+	return demoFeatured()
+}
+
+func (s *service) GetUpcoming() Upcoming {
+	return demoUpcoming()
+}
+
+func (s *service) GetStats() Stats {
+	return demoStats()
+}
+
+func (s *service) GetActiveTicket() ActiveTicket {
+	return demoActiveTicket()
+}
+
+func (s *service) GetSchedules() []Schedule {
+	return demoSchedules()
+}
+
+func demoFeatured() Featured {
+	return Featured{
+		Title:    "Piala Raja Nusantara 2026",
+		Schedule: "Minggu, 6 Des • Batavia Arena, Jaksel",
+		Distance: "3.2 KM",
+		Prize:    "Rp 50 Jt",
+		Slots:    "12 Gantangan",
+		Attendees: FeaturedAttendees{
+			Initials: []string{"MK", "BN"},
+			Others:   48,
+		},
+	}
+}
+
+func demoUpcoming() Upcoming {
+	return Upcoming{
+		Type:             "Latber Presisi",
+		Title:            "Latber Presisi Kacer",
+		Time:             "Besok, 14:00 WIB",
+		Price:            "Rp 75.000",
+		RemainingTickets: 3,
+	}
+}
+
+func demoStats() Stats {
+	return Stats{
+		Badge:        "100% Resmi",
+		Headline:     "520+ Gantangan",
+		Note:         "Terverifikasi panitia & EO resmi.",
+		SecurityNote: "98% Transaksi Tiket Instan & Aman",
+	}
+}
+
+func demoActiveTicket() ActiveTicket {
+	return ActiveTicket{
+		Event:    "Grand Prix Murai Batu VIP #18",
+		Schedule: "Sabtu, 12 Des • Masterpiece Arena",
+		Number:   "#G-18",
+		Session:  "Sesi A - 16G",
+	}
+}
+
+func demoSchedules() []Schedule {
+	return []Schedule{
+		{
+			Title:  "Latpres Exclusive Cucak Ijo",
+			Venue:  "Arena Master Cilandak, Jaksel",
+			Date:   "Selasa, 24 Nov",
+			Price:  "Rp 100rb",
+			Status: "available",
+			Category: ScheduleCategory{
+				ID:   1,
+				Name: "Cucak Hijau",
+			},
+		},
+		{
+			Title:  "Festival Kicau Batavia",
+			Venue:  "Gantangan Taman Mini, Jaktim",
+			Date:   "Kamis, 26 Nov",
+			Price:  "Rp 150rb",
+			Status: "almost_gone",
+			Category: ScheduleCategory{
+				ID:   2,
+				Name: "Murai Batu",
+			},
+		},
+		{
+			Title:  "Latber Kacer Mingguan",
+			Venue:  "Lapangan Kicau Pesanggrahan, Jaksel",
+			Date:   "Sabtu, 28 Nov",
+			Price:  "Rp 60rb",
+			Status: "sold_out",
+			Category: ScheduleCategory{
+				ID:   3,
+				Name: "Kacer",
+			},
+		},
+		{
+			Title:  "Kenari Cup Kemang",
+			Venue:  "Kemang Bird Park, Jaksel",
+			Date:   "Minggu, 29 Nov",
+			Price:  "Rp 85rb",
+			Status: "waiting",
+			Category: ScheduleCategory{
+				ID:   4,
+				Name: "Kenari",
+			},
+		},
+	}
 }
