@@ -14,11 +14,9 @@ type BirdCategoryListOutput struct {
 	Body   Success[[]BirdCategoryPayload]
 }
 
-
 // BirdcategoryDeleteOutput adalah output untuk DELETE.
 type BirdcategoryDeleteOutput struct {
 	Status int `status:"204"`
 }
-
 
 // scaffold:response-types
