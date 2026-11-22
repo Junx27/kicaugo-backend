@@ -2,11 +2,9 @@ package birdcategory
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
-	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
@@ -23,12 +21,6 @@ type BirdCategoryPayload struct {
 type ListOutput struct {
 	Status int `status:"200"`
 	Body   response.Success[[]BirdCategoryPayload]
-}
-
-// GetOutput adalah output untuk GET /bird-categories/{id}.
-type GetOutput struct {
-	Status int `status:"200"`
-	Body   response.Success[BirdCategoryPayload]
 }
 
 func toPayload(c entities.BirdCategory) BirdCategoryPayload {
@@ -58,31 +50,8 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		resp.Body = response.NewSuccess(http.StatusOK, "Bird categories loaded", payloads)
 		return resp, nil
 	})
-
-	// GET /api/v1/bird-categories/{id}
-	apphttp.Register(api, apphttp.Operation{
-		ID:      "getBirdCategory",
-		Method:  http.MethodGet,
-		Path:    "/api/v1/bird-categories/{id}",
-		Summary: "Get Bird Category",
-		Tags:    []string{"bird-categories"},
-	}, func(ctx context.Context, input *struct {
-		ID int64 `path:"id"`
-	}) (*GetOutput, error) {
-		cat, err := service.GetByID(ctx, input.ID)
-		if err != nil {
-			return nil, mapServiceError(err)
-		}
-		resp := &GetOutput{}
-		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Bird category loaded", toPayload(cat))
-		return resp, nil
-	})
 }
 
 func mapServiceError(err error) error {
-	if errors.Is(err, apperrors.ErrNotFound) {
-		return apphttp.NotFound("Bird category not found")
-	}
 	return apphttp.InternalServerError("An error occurred. Please try again.")
 }
