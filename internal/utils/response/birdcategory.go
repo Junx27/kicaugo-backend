@@ -1,7 +1,7 @@
 package response
 
-// BirdCategoryPayload adalah representasi kategori burung di response.
-type BirdCategoryPayload struct {
+// BirdCategoryData adalah representasi kategori burung di response.
+type BirdCategoryData struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`
@@ -11,7 +11,7 @@ type BirdCategoryPayload struct {
 // BirdCategoryListOutput adalah output untuk GET /bird-categories.
 type BirdCategoryListOutput struct {
 	Status int `status:"200"`
-	Body   Success[[]BirdCategoryPayload]
+	Body   Success[[]BirdCategoryData]
 }
 
 // BirdCategoryDeleteOutput adalah output untuk DELETE.

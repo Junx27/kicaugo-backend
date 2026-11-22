@@ -31,7 +31,7 @@ func RegisterRoutes(api apphttp.API, service AuthService, tokens *jwt.Manager) {
 		resp := &response.RegisterOutput{}
 		resp.Status = http.StatusCreated
 		resp.Body = response.NewSuccess(http.StatusCreated, "Registration successful", response.AuthData{
-			User:  toPayload(result.User),
+			User:  toData(result.User),
 			Token: result.Token,
 		})
 		return resp, nil
@@ -52,7 +52,7 @@ func RegisterRoutes(api apphttp.API, service AuthService, tokens *jwt.Manager) {
 		resp := &response.LoginOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "Login successful", response.AuthData{
-			User:  toPayload(result.User),
+			User:  toData(result.User),
 			Token: result.Token,
 		})
 		return resp, nil
@@ -94,14 +94,14 @@ func RegisterRoutes(api apphttp.API, service AuthService, tokens *jwt.Manager) {
 		}
 		resp := &response.MeOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded successfully", toPayload(result))
+		resp.Body = response.NewSuccess(http.StatusOK, "Profile loaded successfully", toData(result))
 		return resp, nil
 	})
 	// scaffold:routes
 }
 
-func toPayload(user entities.User) response.UserPayload {
-	return response.UserPayload{Name: user.Name, Identifier: user.Identifier}
+func toData(user entities.User) response.UserData {
+	return response.UserData{Name: user.Name, Identifier: user.Identifier}
 }
 
 func mapServiceError(err error) error {

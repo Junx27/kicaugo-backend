@@ -11,8 +11,8 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
-func toPayload(c entities.BirdCategory) response.BirdCategoryPayload {
-	return response.BirdCategoryPayload{ID: c.ID, Name: c.Name, Slug: c.Slug, Icon: c.Icon}
+func toData(c entities.BirdCategory) response.BirdCategoryData {
+	return response.BirdCategoryData{ID: c.ID, Name: c.Name, Slug: c.Slug, Icon: c.Icon}
 }
 
 // RegisterRoutes mendaftarkan route bird-category ke Huma API.
@@ -29,13 +29,13 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		payloads := make([]response.BirdCategoryPayload, 0, len(cats))
+		data := make([]response.BirdCategoryData, 0, len(cats))
 		for _, c := range cats {
-			payloads = append(payloads, toPayload(c))
+			data = append(data, toData(c))
 		}
 		resp := &response.BirdCategoryListOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Bird categories loaded", payloads)
+		resp.Body = response.NewSuccess(http.StatusOK, "Bird categories loaded", data)
 		return resp, nil
 	})
 

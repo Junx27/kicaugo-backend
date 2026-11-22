@@ -12,8 +12,8 @@ import (
 {{end}}{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 {{end}})
 
-{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}func toPayload(c entities.{{.DomainPascal}}) response.{{.DomainPascal}}Payload {
-	p := response.{{.DomainPascal}}Payload{ID: c.ID}
+{{if or .Ops.list .Ops.get .Ops.create .Ops.update}}func toData(c entities.{{.DomainPascal}}) response.{{.DomainPascal}}Data {
+	p := response.{{.DomainPascal}}Data{ID: c.ID}
 {{range .Fields}}	p.{{.GoName}} = c.{{.GoName}}
 {{end}}	return p
 }
@@ -46,13 +46,13 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
-		payloads := make([]response.{{.DomainPascal}}Payload, 0, len(items))
+		data := make([]response.{{.DomainPascal}}Data, 0, len(items))
 		for _, it := range items {
-			payloads = append(payloads, toPayload(it))
+			data = append(data, toData(it))
 		}
 		resp := &response.{{.DomainPascal}}ListOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}}s loaded", payloads)
+		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}}s loaded", data)
 		return resp, nil
 	})
 
@@ -72,7 +72,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		}
 		resp := &response.{{.DomainPascal}}GetOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} loaded", toPayload(it))
+		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} loaded", toData(it))
 		return resp, nil
 	})
 
@@ -90,7 +90,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		}
 		resp := &response.{{.DomainPascal}}CreateOutput{}
 		resp.Status = http.StatusCreated
-		resp.Body = response.NewSuccess(http.StatusCreated, "{{.DomainPascal}} created", toPayload(it))
+		resp.Body = response.NewSuccess(http.StatusCreated, "{{.DomainPascal}} created", toData(it))
 		return resp, nil
 	})
 
@@ -108,7 +108,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 		}
 		resp := &response.{{.DomainPascal}}UpdateOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} updated", toPayload(it))
+		resp.Body = response.NewSuccess(http.StatusOK, "{{.DomainPascal}} updated", toData(it))
 		return resp, nil
 	})
 

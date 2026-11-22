@@ -89,8 +89,8 @@ func TestRegister(t *testing.T) {
 					Status  int    `json:"status"`
 					Message string `json:"message"`
 					Data    struct {
-						User  response.UserPayload `json:"user"`
-						Token string               `json:"token"`
+						User  response.UserData `json:"user"`
+						Token string            `json:"token"`
 					} `json:"data"`
 				}
 				if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
@@ -171,9 +171,9 @@ func TestMe(t *testing.T) {
 			t.Fatalf("status = %d, ingin 200; body=%s", resp.Code, resp.Body.String())
 		}
 		var body struct {
-			Status  int                  `json:"status"`
-			Message string               `json:"message"`
-			Data    response.UserPayload `json:"data"`
+			Status  int               `json:"status"`
+			Message string            `json:"message"`
+			Data    response.UserData `json:"data"`
 		}
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 			t.Fatal(err)

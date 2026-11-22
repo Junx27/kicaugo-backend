@@ -1,7 +1,7 @@
 package response
 
-// {{.DomainPascal}}Payload adalah representasi {{.Domain}} di response.
-type {{.DomainPascal}}Payload struct {
+// {{.DomainPascal}}Data adalah representasi {{.Domain}} di response.
+type {{.DomainPascal}}Data struct {
 	ID int64 `json:"id"`
 {{range .Fields}}	{{.GoName}} {{.GoType}} `json:"{{.JSONTag}}"`
 {{end}}}
@@ -9,25 +9,25 @@ type {{.DomainPascal}}Payload struct {
 {{if .Ops.list}}// {{.DomainPascal}}ListOutput adalah output untuk GET list.
 type {{.DomainPascal}}ListOutput struct {
 	Status int `status:"200"`
-	Body   Success[[]{{.DomainPascal}}Payload]
+	Body   Success[[]{{.DomainPascal}}Data]
 }
 
 {{end}}{{if .Ops.get}}// {{.DomainPascal}}GetOutput adalah output untuk GET by id.
 type {{.DomainPascal}}GetOutput struct {
 	Status int `status:"200"`
-	Body   Success[{{.DomainPascal}}Payload]
+	Body   Success[{{.DomainPascal}}Data]
 }
 
 {{end}}{{if .Ops.create}}// {{.DomainPascal}}CreateOutput adalah output untuk POST.
 type {{.DomainPascal}}CreateOutput struct {
 	Status int `status:"201"`
-	Body   Success[{{.DomainPascal}}Payload]
+	Body   Success[{{.DomainPascal}}Data]
 }
 
 {{end}}{{if .Ops.update}}// {{.DomainPascal}}UpdateOutput adalah output untuk PUT.
 type {{.DomainPascal}}UpdateOutput struct {
 	Status int `status:"200"`
-	Body   Success[{{.DomainPascal}}Payload]
+	Body   Success[{{.DomainPascal}}Data]
 }
 
 {{end}}{{if .Ops.delete}}// {{.DomainPascal}}DeleteOutput adalah output untuk DELETE.

@@ -2,12 +2,12 @@ package response
 
 // AuthData adalah data response untuk register dan login.
 type AuthData struct {
-	User  UserPayload `json:"user"`
-	Token string      `json:"token"`
+	User  UserData `json:"user"`
+	Token string   `json:"token"`
 }
 
-// UserPayload adalah representasi user di response.
-type UserPayload struct {
+// UserData adalah representasi user di response.
+type UserData struct {
 	Name       string `json:"name"`
 	Identifier string `json:"identifier"`
 }
@@ -27,7 +27,7 @@ type LoginOutput struct {
 // MeOutput adalah output untuk GET /me.
 type MeOutput struct {
 	Status int `status:"200"`
-	Body   Success[UserPayload]
+	Body   Success[UserData]
 }
 
 // LogoutOutput adalah output untuk logout.
