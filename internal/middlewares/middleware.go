@@ -21,6 +21,11 @@ type TokenParser[T any] interface {
 	Parse(raw string) (T, error)
 }
 
+// OrganizerChecker memeriksa apakah identifier memiliki membership organizer aktif.
+type OrganizerChecker interface {
+	HasActiveMembership(ctx context.Context, identifier string) (bool, error)
+}
+
 // AuthMiddleware membuat middleware Huma untuk autentikasi JWT.
 func AuthMiddleware[T any](tokens TokenParser[T]) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
@@ -56,7 +61,38 @@ func UserFromContext[T any](ctx context.Context) (T, bool) {
 	return user, ok
 }
 
+// OrganizerOnly membuat middleware yang hanya mengizinkan organizer aktif.
+func OrganizerOnly[T any](checker OrganizerChecker, subject func(T) string) func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		user, ok := UserFromContext[T](ctx.Context())
+		if !ok {
+			writeUnauthorized(ctx, "Authentication required")
+			return
+		}
+		identifier := subject(user)
+		if strings.TrimSpace(identifier) == "" {
+			writeUnauthorized(ctx, "Authentication required")
+			return
+		}
+		active, err := checker.HasActiveMembership(ctx.Context(), identifier)
+		if err != nil {
+			writeForbidden(ctx, "Unable to verify organizer access")
+			return
+		}
+		if !active {
+			writeForbidden(ctx, "Organizer access required")
+			return
+		}
+		next(ctx)
+	}
+}
+
 func writeUnauthorized(ctx huma.Context, message string) {
 	ctx.SetStatus(http.StatusUnauthorized)
 	_, _ = ctx.BodyWriter().Write([]byte(`{"status":401,"message":"` + message + `","data":null}`))
+}
+
+func writeForbidden(ctx huma.Context, message string) {
+	ctx.SetStatus(http.StatusForbidden)
+	_, _ = ctx.BodyWriter().Write([]byte(`{"status":403,"message":"` + message + `","data":null}`))
 }

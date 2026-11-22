@@ -56,7 +56,7 @@ type eventFixture struct {
 	categoryID *int64
 }
 
-func insertEvent(t *testing.T, conn db, ctx context.Context, organizerID int64, f eventFixture) int64 {
+func seedEvent(t *testing.T, conn db, ctx context.Context, organizerID int64, f eventFixture) int64 {
 	t.Helper()
 	var id int64
 	err := conn.QueryRow(ctx, `
@@ -95,24 +95,24 @@ func TestRepositoryListNearby(t *testing.T) {
 
 	originLat, originLng := cityLat, cityLng-0.02
 	expired := time.Now().AddDate(0, 0, -2)
-	nearID := insertEvent(t, conn, ctx, organizerID, eventFixture{
+	nearID := seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "dekat-" + testSuffix(t), latitude: float64Ptr(originLat), longitude: float64Ptr(originLng + 0.01), status: "published",
 	})
-	fallbackID := insertEvent(t, conn, ctx, organizerID, eventFixture{
+	fallbackID := seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "kota-" + testSuffix(t), cityID: &cityID, status: "ongoing",
 	})
-	categoryEventID := insertEvent(t, conn, ctx, organizerID, eventFixture{
+	categoryEventID := seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "kategori-" + testSuffix(t), latitude: float64Ptr(originLat), longitude: float64Ptr(originLng + 0.01),
 		status: "published", categoryID: &categoryID,
 	})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{
+	seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "draft-" + testSuffix(t), latitude: float64Ptr(originLat), longitude: float64Ptr(originLng), status: "draft",
 	})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{
+	seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "kedaluwarsa-" + testSuffix(t), latitude: float64Ptr(originLat), longitude: float64Ptr(originLng),
 		status: "published", endDate: &expired,
 	})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{
+	seedEvent(t, conn, ctx, organizerID, eventFixture{
 		slug: "jauh-" + testSuffix(t), latitude: float64Ptr(originLat), longitude: float64Ptr(originLng + 15), status: "published",
 	})
 
@@ -181,10 +181,10 @@ func TestRepositoryCountOngoing(t *testing.T) {
 	}
 	future := time.Now().AddDate(0, 0, 2)
 	expired := time.Now().AddDate(0, 0, -2)
-	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-" + testSuffix(t), status: "ongoing"})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-akhir-" + testSuffix(t), status: "ongoing", endDate: &future})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "selesai-" + testSuffix(t), status: "ongoing", endDate: &expired})
-	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "diterbitkan-" + testSuffix(t), status: "published"})
+	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-" + testSuffix(t), status: "ongoing"})
+	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-akhir-" + testSuffix(t), status: "ongoing", endDate: &future})
+	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "selesai-" + testSuffix(t), status: "ongoing", endDate: &expired})
+	seedEvent(t, conn, ctx, organizerID, eventFixture{slug: "diterbitkan-" + testSuffix(t), status: "published"})
 
 	after, err := repo.CountOngoing(ctx)
 	if err != nil {

@@ -23,19 +23,90 @@ type NearbyOrigin struct {
 
 // Event adalah ringkasan event hasil pencarian terdekat.
 type Event struct {
-	ID         int64
-	Title      string
-	Slug       string
-	Venue      string
-	City       string
-	Province   string
-	CityID     *int64
-	ProvinceID *int64
-	Latitude   *float64
-	Longitude  *float64
-	StartDate  *time.Time
-	EndDate    *time.Time
-	Status     string
-	BannerURL  *string
-	DistanceKM float64
+	ID          int64
+	OrganizerID int64
+	Title       string
+	Slug        string
+	Venue       string
+	City        string
+	Province    string
+	CityID      *int64
+	ProvinceID  *int64
+	Latitude    *float64
+	Longitude   *float64
+	StartDate   *time.Time
+	EndDate     *time.Time
+	Status      string
+	BannerURL   *string
+	DistanceKM  float64
+}
+
+// SubEvent adalah sub-lomba di dalam sebuah event.
+type SubEvent struct {
+	ID             int64
+	EventID        int64
+	BirdCategoryID *int64
+	Title          string
+	Description    *string
+	Session        *string
+	GantanganCount int
+	MaxSlots       int
+	Price          int64
+	Winner1Prize   int64
+	Winner2Prize   int64
+	Winner3Prize   int64
+	Status         string
+	StartTime      *time.Time
+	EndTime        *time.Time
+	SortOrder      int
+}
+
+// EventCreate adalah payload pembuatan event beserta sub-event.
+type EventCreate struct {
+	OrganizerID       int64
+	Title             string
+	Slug              string
+	Description       *string
+	Venue             string
+	Address           *string
+	City              string
+	Province          *string
+	CityID            *int64
+	ProvinceID        *int64
+	Latitude          *float64
+	Longitude         *float64
+	StartDate         *time.Time
+	EndDate           *time.Time
+	RegistrationOpen  *time.Time
+	RegistrationClose *time.Time
+	Status            string
+	IsReusable        bool
+	BannerURL         *string
+	PrizePool         *string
+	TotalSlots        int
+	SubEvents         []SubEventCreate
+}
+
+// SubEventCreate adalah payload pembuatan sub-event.
+type SubEventCreate struct {
+	BirdCategoryID *int64
+	Title          string
+	Description    *string
+	Session        *string
+	GantanganCount int
+	MaxSlots       int
+	Price          int64
+	Winner1Prize   int64
+	Winner2Prize   int64
+	Winner3Prize   int64
+	Status         string
+	StartTime      *time.Time
+	EndTime        *time.Time
+	SortOrder      int
+}
+
+// EventDetail adalah event yang dibuat beserta sub-event-nya.
+type EventDetail struct {
+	Event     Event
+	SubEvents []SubEvent
 }

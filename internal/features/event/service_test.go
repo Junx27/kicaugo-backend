@@ -22,6 +22,11 @@ type fakeRepository struct {
 	listRadius   int
 	listCat      int64
 	listLimit    int
+	activeMember bool
+	activeErr    error
+	createResult entities.EventDetail
+	createErr    error
+	createIn     entities.EventCreate
 }
 
 func (f *fakeRepository) Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error) {
@@ -39,6 +44,15 @@ func (f *fakeRepository) ListNearby(ctx context.Context, origin entities.NearbyO
 
 func (f *fakeRepository) CountOngoing(ctx context.Context) (int, error) {
 	return f.ongoingCount, f.countErr
+}
+
+func (f *fakeRepository) IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error) {
+	return f.activeMember, f.activeErr
+}
+
+func (f *fakeRepository) Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error) {
+	f.createIn = in
+	return f.createResult, f.createErr
 }
 
 func freshCandidate() entities.OriginCandidate {
@@ -137,6 +151,106 @@ func TestServiceCountOngoing(t *testing.T) {
 		svc := NewService(&fakeRepository{countErr: errors.New("db down")})
 		if _, err := svc.CountOngoing(context.Background()); err == nil {
 			t.Error("CountOngoing() ingin error")
+		}
+	})
+}
+
+func TestServiceCreate(t *testing.T) {
+	valid := entities.EventCreate{
+		OrganizerID: 1, Title: " Lomba ", Slug: " lomba ", Venue: "GOR", City: "Bandung", Status: "draft",
+		SubEvents: []entities.SubEventCreate{{Title: " Kelas A ", MaxSlots: 60, Status: "available"}},
+	}
+
+	t.Run("berhasil", func(t *testing.T) {
+		repo := &fakeRepository{activeMember: true, createResult: entities.EventDetail{Event: entities.Event{ID: 9}}}
+		got, err := NewService(repo).Create(context.Background(), "user@example.com", valid)
+		if err != nil || got.Event.ID != 9 || repo.createIn.Title != "Lomba" || repo.createIn.SubEvents[0].Title != "Kelas A" {
+			t.Fatalf("Create() = %+v, %v, in=%+v", got, err, repo.createIn)
+		}
+	})
+
+	t.Run("payload invalid", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", entities.EventCreate{})
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("bukan organizer aktif", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{activeMember: false}).Create(context.Background(), "x", valid)
+		if !errors.Is(err, apperrors.ErrForbidden) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("cek membership error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{activeErr: errors.New("db down")}).Create(context.Background(), "x", valid)
+		if err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("sub event invalid", func(t *testing.T) {
+		bad := valid
+		bad.SubEvents = []entities.SubEventCreate{{Title: "A", MaxSlots: 61, Status: "available"}}
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", bad)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("status event invalid", func(t *testing.T) {
+		bad := valid
+		bad.Status = "unknown"
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", bad)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("total slots invalid", func(t *testing.T) {
+		bad := valid
+		bad.TotalSlots = -1
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", bad)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("sub event status invalid", func(t *testing.T) {
+		bad := valid
+		bad.SubEvents = []entities.SubEventCreate{{Title: "A", MaxSlots: 10, Status: "bad"}}
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", bad)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("repo create error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{activeMember: true, createErr: errors.New("db down")}).Create(context.Background(), "x", valid)
+		if err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("sub event prize invalid", func(t *testing.T) {
+		bad := valid
+		bad.SubEvents = []entities.SubEventCreate{{Title: "A", MaxSlots: 10, Status: "available", Winner1Prize: -1}}
+		_, err := NewService(&fakeRepository{activeMember: true}).Create(context.Background(), "x", bad)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("normalize default status", func(t *testing.T) {
+		in := entities.EventCreate{
+			OrganizerID: 1, Title: "Lomba", Slug: "lomba", Venue: "GOR", City: "Bandung",
+			SubEvents: []entities.SubEventCreate{{Title: "A", MaxSlots: 10}},
+		}
+		repo := &fakeRepository{activeMember: true}
+		_, err := NewService(repo).Create(context.Background(), "x", in)
+		if err != nil || repo.createIn.Status != "draft" || repo.createIn.SubEvents[0].Status != "available" {
+			t.Fatalf("err=%v in=%+v", err, repo.createIn)
 		}
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,10 @@ type fakeService struct {
 		cat    int64
 		limit  int
 	}
+	createResult entities.EventDetail
+	createErr    error
+	createIn     entities.EventCreate
+	createID     string
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -35,6 +40,12 @@ func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusK
 
 func (f *fakeService) CountOngoing(ctx context.Context) (int, error) {
 	return 0, nil
+}
+
+func (f *fakeService) Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error) {
+	f.createIn = in
+	f.createID = identifier
+	return f.createResult, f.createErr
 }
 
 func newTestTokens() *jwt.Manager {
@@ -50,11 +61,20 @@ func bearerHeader(t *testing.T, tokens *jwt.Manager) string {
 	return "Authorization: Bearer " + token
 }
 
+type fakeOrganizerChecker struct {
+	active bool
+	err    error
+}
+
+func (f fakeOrganizerChecker) HasActiveMembership(ctx context.Context, identifier string) (bool, error) {
+	return f.active, f.err
+}
+
 func setupHandler(t *testing.T, svc Service) (humatest.TestAPI, *jwt.Manager) {
 	t.Helper()
 	_, api := humatest.New(t)
 	tokens := newTestTokens()
-	RegisterRoutes(api, svc, tokens)
+	RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
 	return api, tokens
 }
 
@@ -161,6 +181,77 @@ func TestListNearbyHandler(t *testing.T) {
 	})
 }
 
+func TestCreateEventHandler(t *testing.T) {
+	body := `{"organizer_id":1,"title":"Lomba","slug":"lomba","venue":"GOR","city":"Bandung","sub_events":[{"title":"Kelas A","max_slots":60}]}`
+	t.Run("berhasil", func(t *testing.T) {
+		start := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+		end := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
+		st := time.Date(2026, 12, 1, 8, 0, 0, 0, time.UTC)
+		et := time.Date(2026, 12, 1, 10, 0, 0, 0, time.UTC)
+		province := "Jawa Barat"
+		svc := &fakeService{createResult: entities.EventDetail{Event: entities.Event{ID: 11, OrganizerID: 1, Title: "Lomba", Slug: "lomba", Venue: "GOR", City: "Bandung", Province: province, Status: "draft", StartDate: &start, EndDate: &end}, SubEvents: []entities.SubEvent{{ID: 21, EventID: 11, Title: "Kelas A", MaxSlots: 60, Status: "available", StartTime: &st, EndTime: &et}}}}
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+		var out struct {
+			Data struct {
+				Province  *string `json:"province"`
+				StartDate *string `json:"start_date"`
+				EndDate   *string `json:"end_date"`
+				SubEvents []struct {
+					StartTime *string `json:"start_time"`
+					EndTime   *string `json:"end_time"`
+				} `json:"sub_events"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &out); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if out.Data.Province == nil || *out.Data.Province != "Jawa Barat" || out.Data.StartDate == nil || out.Data.EndDate == nil {
+			t.Fatalf("data=%+v", out.Data)
+		}
+		if len(out.Data.SubEvents) != 1 || out.Data.SubEvents[0].StartTime == nil || out.Data.SubEvents[0].EndTime == nil {
+			t.Fatalf("sub=%+v", out.Data.SubEvents)
+		}
+		if svc.createIn.OrganizerID != 1 || len(svc.createIn.SubEvents) != 1 {
+			t.Fatalf("createIn=%+v", svc.createIn)
+		}
+	})
+
+	t.Run("forbidden bukan organizer", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{}, tokens, fakeOrganizerChecker{active: false})
+		resp := api.Post("/api/v1/events", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		_, api := humatest.New(t)
+		RegisterRoutes(api, &fakeService{}, newTestTokens(), fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events", "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("service error", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{createErr: apperrors.ErrForbidden}, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events", bearerHeader(t, tokens), "Content-Type: application/json", strings.NewReader(body))
+		if resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+}
+
 func TestMapServiceError(t *testing.T) {
 	cases := []struct {
 		err  error
@@ -168,7 +259,11 @@ func TestMapServiceError(t *testing.T) {
 	}{
 		{err: apperrors.ErrInvalidRadius, want: http.StatusUnprocessableEntity},
 		{err: apperrors.ErrInvalidPayload, want: http.StatusUnprocessableEntity},
+		{err: apperrors.ErrInvalidCategory, want: http.StatusUnprocessableEntity},
 		{err: apperrors.ErrNotFound, want: http.StatusNotFound},
+		{err: apperrors.ErrOrganizerNotFound, want: http.StatusNotFound},
+		{err: apperrors.ErrForbidden, want: http.StatusForbidden},
+		{err: apperrors.ErrIdentifierTaken, want: http.StatusConflict},
 		{err: errors.New("boom"), want: http.StatusInternalServerError},
 	}
 	for _, tc := range cases {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
@@ -59,7 +60,7 @@ func toEventData(e entities.Event) response.NearbyEventData {
 }
 
 // RegisterRoutes mendaftarkan route event ke Huma API.
-func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
+func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organizerChecker middlewares.OrganizerChecker) {
 	// GET /api/v1/events/nearby — butuh token karena asal berasal dari profil pengguna.
 	apphttp.Register(api, apphttp.Operation{
 		ID:      "listNearbyEvents",
@@ -87,15 +88,105 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		resp.Body = response.NewSuccess(http.StatusOK, "Nearby events loaded", ToData(result))
 		return resp, nil
 	})
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:       "createEvent",
+		Method:   http.MethodPost,
+		Path:     "/api/v1/events",
+		Summary:  "Create Event",
+		Tags:     []string{"event"},
+		Security: []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+			middlewares.OrganizerOnly[jwt.Claims](organizerChecker, func(c jwt.Claims) string { return c.Subject }),
+		},
+	}, func(ctx context.Context, input *request.CreateEventInput) (*response.CreateEventOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		created, err := service.Create(ctx, identifier, toCreateEntity(input))
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.CreateEventOutput{Status: http.StatusCreated}
+		resp.Body = response.NewSuccess(http.StatusCreated, "Event created", toCreatedEventData(created))
+		return resp, nil
+	})
+}
+
+func toCreateEntity(input *request.CreateEventInput) entities.EventCreate {
+	subEvents := make([]entities.SubEventCreate, 0, len(input.Body.SubEvents))
+	for _, s := range input.Body.SubEvents {
+		subEvents = append(subEvents, entities.SubEventCreate{
+			BirdCategoryID: s.BirdCategoryID, Title: s.Title, Description: s.Description, Session: s.Session,
+			GantanganCount: s.GantanganCount, MaxSlots: s.MaxSlots, Price: s.Price,
+			Winner1Prize: s.Winner1Prize, Winner2Prize: s.Winner2Prize, Winner3Prize: s.Winner3Prize,
+			Status: s.Status, StartTime: s.StartTime, EndTime: s.EndTime, SortOrder: s.SortOrder,
+		})
+	}
+	return entities.EventCreate{
+		OrganizerID: input.Body.OrganizerID, Title: input.Body.Title, Slug: input.Body.Slug, Description: input.Body.Description,
+		Venue: input.Body.Venue, Address: input.Body.Address, City: input.Body.City, Province: input.Body.Province,
+		CityID: input.Body.CityID, ProvinceID: input.Body.ProvinceID, Latitude: input.Body.Latitude, Longitude: input.Body.Longitude,
+		StartDate: input.Body.StartDate, EndDate: input.Body.EndDate, RegistrationOpen: input.Body.RegistrationOpen, RegistrationClose: input.Body.RegistrationClose,
+		Status: input.Body.Status, IsReusable: input.Body.IsReusable, BannerURL: input.Body.BannerURL, PrizePool: input.Body.PrizePool,
+		TotalSlots: input.Body.TotalSlots, SubEvents: subEvents,
+	}
+}
+
+func toCreatedEventData(detail entities.EventDetail) response.EventData {
+	data := response.EventData{
+		ID: detail.Event.ID, OrganizerID: detail.Event.OrganizerID, Title: detail.Event.Title, Slug: detail.Event.Slug,
+		Description: nil, Venue: detail.Event.Venue, Address: nil, City: detail.Event.City, Province: nil,
+		CityID: detail.Event.CityID, ProvinceID: detail.Event.ProvinceID, Latitude: detail.Event.Latitude, Longitude: detail.Event.Longitude,
+		Status: detail.Event.Status, IsReusable: false, BannerURL: detail.Event.BannerURL, TotalSlots: 0,
+		SubEvents: make([]response.SubEventData, 0, len(detail.SubEvents)),
+	}
+	if detail.Event.Province != "" {
+		province := detail.Event.Province
+		data.Province = &province
+	}
+	if detail.Event.StartDate != nil {
+		v := detail.Event.StartDate.Format(dateLayout)
+		data.StartDate = &v
+	}
+	if detail.Event.EndDate != nil {
+		v := detail.Event.EndDate.Format(dateLayout)
+		data.EndDate = &v
+	}
+	for _, s := range detail.SubEvents {
+		item := response.SubEventData{
+			ID: s.ID, EventID: s.EventID, BirdCategoryID: s.BirdCategoryID, Title: s.Title, Description: s.Description,
+			Session: s.Session, GantanganCount: s.GantanganCount, MaxSlots: s.MaxSlots, Price: s.Price,
+			Winner1Prize: s.Winner1Prize, Winner2Prize: s.Winner2Prize, Winner3Prize: s.Winner3Prize,
+			Status: s.Status, SortOrder: s.SortOrder,
+		}
+		if s.StartTime != nil {
+			v := s.StartTime.Format(time.RFC3339)
+			item.StartTime = &v
+		}
+		if s.EndTime != nil {
+			v := s.EndTime.Format(time.RFC3339)
+			item.EndTime = &v
+		}
+		data.SubEvents = append(data.SubEvents, item)
+	}
+	return data
 }
 
 func mapServiceError(err error) error {
 	switch {
 	case errors.Is(err, apperrors.ErrInvalidRadius),
-		errors.Is(err, apperrors.ErrInvalidPayload):
+		errors.Is(err, apperrors.ErrInvalidPayload),
+		errors.Is(err, apperrors.ErrInvalidCategory):
 		return apphttp.UnprocessableEntity("Please check your input data")
-	case errors.Is(err, apperrors.ErrNotFound):
-		return apphttp.NotFound("User not found")
+	case errors.Is(err, apperrors.ErrNotFound), errors.Is(err, apperrors.ErrOrganizerNotFound):
+		return apphttp.NotFound("Resource not found")
+	case errors.Is(err, apperrors.ErrForbidden):
+		return apphttp.Forbidden("Organizer access required")
+	case errors.Is(err, apperrors.ErrIdentifierTaken):
+		return apphttp.Conflict("Event data already exists")
 	default:
 		return apphttp.InternalServerError("An error occurred. Please try again.")
 	}

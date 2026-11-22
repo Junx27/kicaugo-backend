@@ -19,6 +19,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/city"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
 	"github.com/Junx27/kicaugo-backend/internal/features/home"
+	"github.com/Junx27/kicaugo-backend/internal/features/organizer"
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
@@ -37,13 +38,14 @@ const (
 
 // Dependencies berisi konfigurasi dan service yang dibutuhkan server.
 type Dependencies struct {
-	Config   *config.Config
-	Tokens   *jwt.Manager
-	Province province.Service
-	City     city.Service
-	Profile  profile.Service
-	Event    event.Service
-	Home     home.Service
+	Config    *config.Config
+	Tokens    *jwt.Manager
+	Province  province.Service
+	City      city.Service
+	Profile   profile.Service
+	Event     event.Service
+	Home      home.Service
+	Organizer organizer.Service
 	// scaffold:deps
 	Auth           auth.AuthService
 	BirdCategories birdcategory.Service
@@ -60,7 +62,8 @@ func Run(ctx context.Context, deps Dependencies) error {
 	province.RegisterRoutes(api, deps.Province)
 	city.RegisterRoutes(api, deps.City)
 	profile.RegisterRoutes(api, deps.Profile, deps.Tokens)
-	event.RegisterRoutes(api, deps.Event, deps.Tokens)
+	organizer.RegisterRoutes(api, deps.Organizer, deps.Tokens)
+	event.RegisterRoutes(api, deps.Event, deps.Tokens, deps.Organizer)
 	home.RegisterRoutes(api, deps.Home, deps.Tokens)
 	// scaffold:routes
 	router.Get("/health", healthHandler)

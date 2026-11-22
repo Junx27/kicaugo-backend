@@ -71,3 +71,67 @@ func TestUserFromContextTipeSalah(t *testing.T) {
 		t.Error("UserFromContext() ingin false untuk tipe yang salah")
 	}
 }
+
+type fakeOrganizerChecker struct {
+	active bool
+	err    error
+}
+
+func (f fakeOrganizerChecker) HasActiveMembership(ctx context.Context, identifier string) (bool, error) {
+	return f.active, f.err
+}
+
+func TestOrganizerOnly(t *testing.T) {
+	t.Run("aktif", func(t *testing.T) {
+		_, api := humatest.New(t)
+		api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+			next(huma.WithValue(ctx, userKey, "user@example.com"))
+		})
+		api.UseMiddleware(OrganizerOnly[string](fakeOrganizerChecker{active: true}, func(s string) string { return s }))
+		huma.Get(api, "/ok", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
+		if resp := api.Get("/ok"); resp.Code != http.StatusNoContent {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("bukan organizer", func(t *testing.T) {
+		_, api := humatest.New(t)
+		api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+			next(huma.WithValue(ctx, userKey, "user@example.com"))
+		})
+		api.UseMiddleware(OrganizerOnly[string](fakeOrganizerChecker{active: false}, func(s string) string { return s }))
+		huma.Get(api, "/ok", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
+		if resp := api.Get("/ok"); resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("tanpa user", func(t *testing.T) {
+		_, api := humatest.New(t)
+		api.UseMiddleware(OrganizerOnly[string](fakeOrganizerChecker{active: true}, func(s string) string { return s }))
+		huma.Get(api, "/ok", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
+		if resp := api.Get("/ok"); resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("subject kosong", func(t *testing.T) {
+		_, api := humatest.New(t)
+		api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) { next(huma.WithValue(ctx, userKey, "x")) })
+		api.UseMiddleware(OrganizerOnly[string](fakeOrganizerChecker{active: true}, func(string) string { return "" }))
+		huma.Get(api, "/ok", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
+		if resp := api.Get("/ok"); resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+
+	t.Run("checker error", func(t *testing.T) {
+		_, api := humatest.New(t)
+		api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) { next(huma.WithValue(ctx, userKey, "x")) })
+		api.UseMiddleware(OrganizerOnly[string](fakeOrganizerChecker{err: errors.New("db")}, func(s string) string { return s }))
+		huma.Get(api, "/ok", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
+		if resp := api.Get("/ok"); resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+}

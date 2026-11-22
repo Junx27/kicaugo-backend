@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -13,11 +14,15 @@ import (
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
-// Repository menyediakan asal pencarian, daftar event terdekat, dan jumlah event berlangsung.
+const uniqueViolation = "23505"
+
+// Repository menyediakan operasi event.
 type Repository interface {
 	Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error)
 	ListNearby(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.Event, error)
 	CountOngoing(ctx context.Context) (int, error)
+	IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error)
+	Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error)
 }
 
 // db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
@@ -25,6 +30,7 @@ type db interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
 // repository adalah implementasi Repository berbasis pgx.
@@ -136,4 +142,112 @@ func (r *repository) ListNearby(ctx context.Context, origin entities.NearbyOrigi
 		return nil, fmt.Errorf("iterate nearby events: %w", err)
 	}
 	return out, nil
+}
+
+// IsActiveOrganizerMember memeriksa keanggotaan organizer aktif milik identifier.
+func (r *repository) IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error) {
+	const query = `SELECT EXISTS (
+		SELECT 1
+		FROM event_organizer_users eou
+		JOIN users u ON u.id = eou.user_id
+		WHERE u.identifier = $1 AND eou.organizer_id = $2 AND eou.is_active = true
+	)`
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, identifier, organizerID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check organizer member: %w", err)
+	}
+	return exists, nil
+}
+
+// Create menyimpan event dan sub-event dalam satu transaksi.
+func (r *repository) Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return entities.EventDetail{}, fmt.Errorf("begin create event: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	event, err := insertEvent(ctx, tx, in)
+	if err != nil {
+		return entities.EventDetail{}, err
+	}
+	subEvents, err := insertSubEvents(ctx, tx, event.ID, in.SubEvents)
+	if err != nil {
+		return entities.EventDetail{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return entities.EventDetail{}, fmt.Errorf("commit create event: %w", err)
+	}
+	return entities.EventDetail{Event: event, SubEvents: subEvents}, nil
+}
+
+func insertEvent(ctx context.Context, tx pgx.Tx, in entities.EventCreate) (entities.Event, error) {
+	const query = `INSERT INTO events (
+		organizer_id, title, slug, description, venue, address, city, province,
+		city_id, province_id, latitude, longitude, start_date, end_date,
+		registration_open, registration_close, status, is_reusable, banner_url,
+		prize_pool, total_slots
+	) VALUES (
+		$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+	) RETURNING id, title, slug, venue, city, COALESCE(province,''), city_id, province_id, latitude, longitude, start_date, end_date, status, banner_url`
+	var out entities.Event
+	err := tx.QueryRow(ctx, query,
+		in.OrganizerID, in.Title, in.Slug, in.Description, in.Venue, in.Address, in.City, in.Province,
+		in.CityID, in.ProvinceID, in.Latitude, in.Longitude, in.StartDate, in.EndDate,
+		in.RegistrationOpen, in.RegistrationClose, in.Status, in.IsReusable, in.BannerURL,
+		in.PrizePool, in.TotalSlots,
+	).Scan(&out.ID, &out.Title, &out.Slug, &out.Venue, &out.City, &out.Province, &out.CityID, &out.ProvinceID, &out.Latitude, &out.Longitude, &out.StartDate, &out.EndDate, &out.Status, &out.BannerURL)
+	if err != nil {
+		return entities.Event{}, mapCreateEventError(err)
+	}
+	out.OrganizerID = in.OrganizerID
+	return out, nil
+}
+
+func insertSubEvents(ctx context.Context, tx pgx.Tx, eventID int64, items []entities.SubEventCreate) ([]entities.SubEvent, error) {
+	out := make([]entities.SubEvent, 0, len(items))
+	for _, item := range items {
+		sub, err := insertSubEvent(ctx, tx, eventID, item)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sub)
+	}
+	return out, nil
+}
+
+func insertSubEvent(ctx context.Context, tx pgx.Tx, eventID int64, in entities.SubEventCreate) (entities.SubEvent, error) {
+	const query = `INSERT INTO sub_events (
+		event_id, bird_category_id, title, description, session, gantangan_count,
+		max_slots, price, winner_1_prize, winner_2_prize, winner_3_prize, status,
+		start_time, end_time, sort_order
+	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+	RETURNING id, event_id, bird_category_id, title, description, session, gantangan_count, max_slots, price, winner_1_prize, winner_2_prize, winner_3_prize, status, start_time, end_time, sort_order`
+	var out entities.SubEvent
+	err := tx.QueryRow(ctx, query,
+		eventID, in.BirdCategoryID, in.Title, in.Description, in.Session, in.GantanganCount,
+		in.MaxSlots, in.Price, in.Winner1Prize, in.Winner2Prize, in.Winner3Prize, in.Status,
+		in.StartTime, in.EndTime, in.SortOrder,
+	).Scan(&out.ID, &out.EventID, &out.BirdCategoryID, &out.Title, &out.Description, &out.Session, &out.GantanganCount, &out.MaxSlots, &out.Price, &out.Winner1Prize, &out.Winner2Prize, &out.Winner3Prize, &out.Status, &out.StartTime, &out.EndTime, &out.SortOrder)
+	if err != nil {
+		return entities.SubEvent{}, mapCreateEventError(err)
+	}
+	return out, nil
+}
+
+func mapCreateEventError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return apperrors.ErrIdentifierTaken
+	}
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		if strings.Contains(pgErr.ConstraintName, "bird_category") {
+			return apperrors.ErrInvalidCategory
+		}
+		if strings.Contains(pgErr.ConstraintName, "organizer") {
+			return apperrors.ErrOrganizerNotFound
+		}
+		return apperrors.ErrInvalidPayload
+	}
+	return fmt.Errorf("create event: %w", err)
 }
