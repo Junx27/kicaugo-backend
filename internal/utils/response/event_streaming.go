@@ -18,3 +18,9 @@ type StartEventStreamingOutput struct {
 	Status int `status:"201"`
 	Body   Success[EventStreamingData]
 }
+
+// StopEventStreamingOutput adalah output POST /api/v1/events/{id}/streamings/stop.
+type StopEventStreamingOutput struct {
+	Status int `status:"200"`
+	Body   Success[EventStreamingData]
+}

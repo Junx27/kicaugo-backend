@@ -142,6 +142,31 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 		resp.Body = response.NewSuccess(http.StatusCreated, "Event streaming started", toStreamingData(created))
 		return resp, nil
 	})
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:       "stopEventStreaming",
+		Method:   http.MethodPost,
+		Path:     "/api/v1/events/{id}/streamings/stop",
+		Summary:  "Stop Event Streaming",
+		Tags:     []string{"event"},
+		Security: []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{
+			middlewares.AuthMiddleware[jwt.Claims](tokens),
+			middlewares.OrganizerOnly[jwt.Claims](organizerChecker, func(c jwt.Claims) string { return c.Subject }),
+		},
+	}, func(ctx context.Context, input *request.StopEventStreamingInput) (*response.StopEventStreamingOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		stopped, err := service.StopStreaming(ctx, identifier, input.ID)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.StopEventStreamingOutput{Status: http.StatusOK}
+		resp.Body = response.NewSuccess(http.StatusOK, "Event streaming stopped", toStreamingData(stopped))
+		return resp, nil
+	})
 }
 
 func toCreateEntity(input *request.CreateEventInput) entities.EventCreate {
@@ -228,7 +253,8 @@ func mapServiceError(err error) error {
 	case errors.Is(err, apperrors.ErrForbidden):
 		return apphttp.Forbidden("Organizer access required")
 	case errors.Is(err, apperrors.ErrIdentifierTaken),
-		errors.Is(err, apperrors.ErrStreamingAlreadyActive):
+		errors.Is(err, apperrors.ErrStreamingAlreadyActive),
+		errors.Is(err, apperrors.ErrStreamingNotActive):
 		return apphttp.Conflict("Event data already exists")
 	default:
 		return apphttp.InternalServerError("An error occurred. Please try again.")

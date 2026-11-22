@@ -33,6 +33,10 @@ type fakeService struct {
 	streamingErr    error
 	streamingIn     entities.StartEventStreamingInput
 	streamingID     string
+	stopResult      entities.EventStreaming
+	stopErr         error
+	stopEventID     int64
+	stopID          string
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -56,6 +60,12 @@ func (f *fakeService) StartStreaming(ctx context.Context, identifier string, in 
 	f.streamingIn = in
 	f.streamingID = identifier
 	return f.streamingResult, f.streamingErr
+}
+
+func (f *fakeService) StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error) {
+	f.stopEventID = eventID
+	f.stopID = identifier
+	return f.stopResult, f.stopErr
 }
 
 func (f *fakeService) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
@@ -337,6 +347,55 @@ func TestStartEventStreamingHandler(t *testing.T) {
 	})
 }
 
+func TestStopEventStreamingHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		end := time.Date(2026, 11, 22, 11, 0, 0, 0, time.UTC)
+		svc := &fakeService{stopResult: entities.EventStreaming{ID: 3, EventID: 68, EndTime: &end, LinkStream: "https://youtube.com/live/abc"}}
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
+		resp := api.Post("/api/v1/events/68/streamings/stop", bearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+		var out struct {
+			Data struct {
+				ID      int64   `json:"id"`
+				EndTime *string `json:"end_time"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &out); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if out.Data.ID != 3 || out.Data.EndTime == nil || svc.stopEventID != 68 {
+			t.Fatalf("out=%+v svc=%+v", out, svc)
+		}
+	})
+	t.Run("unauthorized", func(t *testing.T) {
+		_, api := humatest.New(t)
+		RegisterRoutes(api, &fakeService{}, newTestTokens(), fakeOrganizerChecker{active: true})
+		if resp := api.Post("/api/v1/events/68/streamings/stop"); resp.Code != http.StatusUnauthorized {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+	t.Run("forbidden bukan organizer", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{}, tokens, fakeOrganizerChecker{active: false})
+		if resp := api.Post("/api/v1/events/68/streamings/stop", bearerHeader(t, tokens)); resp.Code != http.StatusForbidden {
+			t.Fatalf("status=%d", resp.Code)
+		}
+	})
+	t.Run("no active streaming", func(t *testing.T) {
+		_, api := humatest.New(t)
+		tokens := newTestTokens()
+		RegisterRoutes(api, &fakeService{stopErr: apperrors.ErrStreamingNotActive}, tokens, fakeOrganizerChecker{active: true})
+		if resp := api.Post("/api/v1/events/68/streamings/stop", bearerHeader(t, tokens)); resp.Code != http.StatusConflict {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+		}
+	})
+}
+
 func TestMapServiceError(t *testing.T) {
 	cases := []struct {
 		err  error
@@ -351,6 +410,7 @@ func TestMapServiceError(t *testing.T) {
 		{err: apperrors.ErrForbidden, want: http.StatusForbidden},
 		{err: apperrors.ErrIdentifierTaken, want: http.StatusConflict},
 		{err: apperrors.ErrStreamingAlreadyActive, want: http.StatusConflict},
+		{err: apperrors.ErrStreamingNotActive, want: http.StatusConflict},
 		{err: errors.New("boom"), want: http.StatusInternalServerError},
 	}
 	for _, tc := range cases {

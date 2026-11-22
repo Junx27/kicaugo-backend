@@ -10,3 +10,8 @@ type StartEventStreamingInput struct {
 		Juara      json.RawMessage `json:"juara,omitempty" doc:"Informasi juara dalam format JSON"`
 	}
 }
+
+// StopEventStreamingInput adalah input POST /api/v1/events/{id}/streamings/stop.
+type StopEventStreamingInput struct {
+	ID int64 `path:"id" minimum:"1" doc:"ID event"`
+}

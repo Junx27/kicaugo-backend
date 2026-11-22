@@ -21,4 +21,5 @@ var (
 	ErrOrganizerMemberTaken   = errors.New("organizer member already registered")
 	ErrStreamingAlreadyActive = errors.New("streaming already active")
 	ErrEventNotStreamable     = errors.New("event not streamable")
+	ErrStreamingNotActive     = errors.New("streaming not active")
 )

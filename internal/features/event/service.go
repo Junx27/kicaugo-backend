@@ -24,6 +24,7 @@ type Service interface {
 	CountOngoing(ctx context.Context) (int, error)
 	Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error)
 	StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
+	StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 }
 
@@ -87,6 +88,25 @@ func (s *service) StartStreaming(ctx context.Context, identifier string, in enti
 		return entities.EventStreaming{}, apperrors.ErrStreamingAlreadyActive
 	}
 	return s.repo.CreateStreaming(ctx, in)
+}
+
+// StopStreaming menghentikan streaming aktif milik event organizer.
+func (s *service) StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error) {
+	if eventID <= 0 {
+		return entities.EventStreaming{}, apperrors.ErrInvalidPayload
+	}
+	ev, err := s.repo.EventByID(ctx, eventID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	active, err := s.repo.IsActiveOrganizerMember(ctx, identifier, ev.OrganizerID)
+	if err != nil {
+		return entities.EventStreaming{}, err
+	}
+	if !active {
+		return entities.EventStreaming{}, apperrors.ErrForbidden
+	}
+	return s.repo.StopStreaming(ctx, eventID)
 }
 
 // GetActiveStreaming mengambil satu streaming aktif terbaru.

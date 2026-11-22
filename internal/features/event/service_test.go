@@ -34,6 +34,9 @@ type fakeRepository struct {
 	streamingResult    entities.EventStreaming
 	streamingErr       error
 	streamingIn        entities.StartEventStreamingInput
+	stopResult         entities.EventStreaming
+	stopErr            error
+	stopEventID        int64
 	activeStreaming    *entities.ActiveEventStreaming
 	activeStreamingErr error
 }
@@ -75,6 +78,11 @@ func (f *fakeRepository) HasActiveStreaming(ctx context.Context, eventID int64) 
 func (f *fakeRepository) CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error) {
 	f.streamingIn = in
 	return f.streamingResult, f.streamingErr
+}
+
+func (f *fakeRepository) StopStreaming(ctx context.Context, eventID int64) (entities.EventStreaming, error) {
+	f.stopEventID = eventID
+	return f.stopResult, f.stopErr
 }
 
 func (f *fakeRepository) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
@@ -191,6 +199,53 @@ func TestServiceGetActiveStreaming(t *testing.T) {
 	})
 	t.Run("error", func(t *testing.T) {
 		_, err := NewService(&fakeRepository{activeStreamingErr: errors.New("db down")}).GetActiveStreaming(context.Background())
+		if err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+}
+
+func TestServiceStopStreaming(t *testing.T) {
+	ev := entities.Event{ID: 10, OrganizerID: 5, Status: "published"}
+	t.Run("berhasil", func(t *testing.T) {
+		repo := &fakeRepository{eventByID: ev, activeMember: true, stopResult: entities.EventStreaming{ID: 7, EventID: 10}}
+		got, err := NewService(repo).StopStreaming(context.Background(), "user@example.com", 10)
+		if err != nil || got.ID != 7 || repo.stopEventID != 10 {
+			t.Fatalf("got=%+v err=%v repo=%+v", got, err, repo)
+		}
+	})
+	t.Run("event id invalid", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{}).StopStreaming(context.Background(), "x", 0)
+		if !errors.Is(err, apperrors.ErrInvalidPayload) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("event not found", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByIDErr: apperrors.ErrNotFound}).StopStreaming(context.Background(), "x", 10)
+		if !errors.Is(err, apperrors.ErrNotFound) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("cek membership error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeErr: errors.New("db down")}).StopStreaming(context.Background(), "x", 10)
+		if err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+	t.Run("bukan anggota aktif", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: false}).StopStreaming(context.Background(), "x", 10)
+		if !errors.Is(err, apperrors.ErrForbidden) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("streaming tidak aktif", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: true, stopErr: apperrors.ErrStreamingNotActive}).StopStreaming(context.Background(), "x", 10)
+		if !errors.Is(err, apperrors.ErrStreamingNotActive) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+	t.Run("repo error", func(t *testing.T) {
+		_, err := NewService(&fakeRepository{eventByID: ev, activeMember: true, stopErr: errors.New("db down")}).StopStreaming(context.Background(), "x", 10)
 		if err == nil {
 			t.Fatal("ingin error")
 		}
