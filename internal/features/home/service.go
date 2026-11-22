@@ -3,6 +3,8 @@ package home
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
@@ -27,6 +29,7 @@ type EventReader interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error)
 	CountOngoing(ctx context.Context) (int, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
+	GetRandomFeatured(ctx context.Context) (*entities.Event, error)
 }
 
 // BirdCategoryReader adalah bagian birdcategory.Service yang dipakai home.
@@ -103,7 +106,7 @@ type Schedule struct {
 // Service menyediakan data halaman home.
 type Service interface {
 	Get(ctx context.Context, identifier string, opts Options) (View, error)
-	GetFeatured() Featured
+	GetFeatured(ctx context.Context) (Featured, error)
 	GetUpcoming() Upcoming
 	GetStats() Stats
 	GetActiveTicket() ActiveTicket
@@ -156,8 +159,15 @@ func (s *service) Get(ctx context.Context, identifier string, opts Options) (Vie
 	}, nil
 }
 
-func (s *service) GetFeatured() Featured {
-	return demoFeatured()
+func (s *service) GetFeatured(ctx context.Context) (Featured, error) {
+	ev, err := s.events.GetRandomFeatured(ctx)
+	if err != nil {
+		return Featured{}, err
+	}
+	if ev == nil {
+		return emptyFeatured(), nil
+	}
+	return featuredFromEvent(*ev), nil
 }
 
 func (s *service) GetUpcoming() Upcoming {
@@ -180,18 +190,50 @@ func (s *service) GetBirdCategories(ctx context.Context) ([]entities.BirdCategor
 	return s.birdCategories.List(ctx)
 }
 
-func demoFeatured() Featured {
+func emptyFeatured() Featured {
 	return Featured{
-		Title:    "Piala Raja Nusantara 2026",
-		Schedule: "Minggu, 6 Des • Batavia Arena, Jaksel",
-		Distance: "3.2 KM",
-		Prize:    "Rp 50 Jt",
-		Slots:    "12 Gantangan",
-		Attendees: FeaturedAttendees{
-			Initials: []string{"MK", "BN"},
-			Others:   48,
-		},
+		Title:     "Belum ada event featured",
+		Schedule:  "-",
+		Distance:  "-",
+		Prize:     "-",
+		Slots:     "-",
+		Attendees: FeaturedAttendees{Initials: []string{}, Others: 0},
 	}
+}
+
+func featuredFromEvent(ev entities.Event) Featured {
+	schedule := "-"
+	if ev.StartDate != nil {
+		schedule = ev.StartDate.Format("02 Jan 2006")
+	}
+	location := stringsTrimJoin([]string{ev.Venue, ev.City})
+	if location != "" && schedule != "-" {
+		schedule = fmt.Sprintf("%s • %s", schedule, location)
+	} else if location != "" {
+		schedule = location
+	}
+	return Featured{
+		Title:     ev.Title,
+		Schedule:  schedule,
+		Distance:  "-",
+		Prize:     "-",
+		Slots:     "-",
+		Attendees: FeaturedAttendees{Initials: []string{}, Others: 0},
+	}
+}
+
+func stringsTrimJoin(parts []string) string {
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return strings.Join(out, ", ")
 }
 
 func demoUpcoming() Upcoming {

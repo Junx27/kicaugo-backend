@@ -27,6 +27,7 @@ type Service interface {
 	UpdateStreamingJuara(ctx context.Context, identifier string, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
 	StopStreaming(ctx context.Context, identifier string, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
+	GetRandomFeatured(ctx context.Context) (*entities.Event, error)
 }
 
 // service adalah implementasi Service.
@@ -132,6 +133,11 @@ func (s *service) StopStreaming(ctx context.Context, identifier string, eventID 
 // GetActiveStreaming mengambil satu streaming aktif terbaru.
 func (s *service) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
 	return s.repo.GetActiveStreaming(ctx)
+}
+
+// GetRandomFeatured mengambil satu event acak untuk featured home.
+func (s *service) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+	return s.repo.GetRandomFeatured(ctx)
 }
 
 func validateCreateInput(in entities.EventCreate) error {

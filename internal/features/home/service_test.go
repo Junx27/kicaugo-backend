@@ -29,6 +29,8 @@ type fakeEventReader struct {
 	countErr        error
 	activeStreaming *entities.ActiveEventStreaming
 	activeErr       error
+	featured        *entities.Event
+	featuredErr     error
 	identifier      string
 	opts            Options
 }
@@ -45,6 +47,10 @@ func (f *fakeEventReader) CountOngoing(ctx context.Context) (int, error) {
 
 func (f *fakeEventReader) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
 	return f.activeStreaming, f.activeErr
+}
+
+func (f *fakeEventReader) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+	return f.featured, f.featuredErr
 }
 
 type fakeBirdCategoryReader struct {
@@ -121,11 +127,12 @@ func TestServiceGet(t *testing.T) {
 }
 
 func TestServiceDummySections(t *testing.T) {
-	svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{})
+	start := time.Date(2026, 12, 6, 0, 0, 0, 0, time.UTC)
+	svc := NewService(&fakeProfileReader{}, &fakeEventReader{featured: &entities.Event{Title: "Piala Raja Nusantara 2026", Venue: "Batavia Arena", City: "Jaksel", StartDate: &start}}, &fakeBirdCategoryReader{})
 
-	featured := svc.GetFeatured()
-	if featured.Title == "" || len(featured.Attendees.Initials) != 2 || featured.Attendees.Others != 48 {
-		t.Errorf("featured = %+v", featured)
+	featured, err := svc.GetFeatured(context.Background())
+	if err != nil || featured.Title != "Piala Raja Nusantara 2026" || featured.Distance != "-" || featured.Prize != "-" || len(featured.Attendees.Initials) != 0 {
+		t.Fatalf("featured=%+v err=%v", featured, err)
 	}
 
 	upcoming := svc.GetUpcoming()
@@ -150,6 +157,22 @@ func TestServiceDummySections(t *testing.T) {
 	if schedules[0].Status != "available" || schedules[0].Category.Name != "Cucak Hijau" {
 		t.Errorf("schedule[0] = %+v", schedules[0])
 	}
+}
+
+func TestServiceGetFeatured(t *testing.T) {
+	t.Run("kosong", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{})
+		got, err := svc.GetFeatured(context.Background())
+		if err != nil || got.Title != "Belum ada event featured" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
+	t.Run("error", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{featuredErr: errors.New("db down")}, &fakeBirdCategoryReader{})
+		if _, err := svc.GetFeatured(context.Background()); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
 }
 
 func TestServiceGetBirdCategories(t *testing.T) {

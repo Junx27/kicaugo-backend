@@ -82,6 +82,10 @@ func (f *fakeService) GetActiveStreaming(ctx context.Context) (*entities.ActiveE
 	return nil, nil
 }
 
+func (f *fakeService) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+	return nil, nil
+}
+
 func newTestTokens() *jwt.Manager {
 	return jwt.NewManager([]byte("rahasia-untuk-test"), time.Hour)
 }

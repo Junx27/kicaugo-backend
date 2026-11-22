@@ -156,9 +156,13 @@ func newGetFeaturedHandler(service Service) func(context.Context, *struct{}) (*r
 		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
 			return nil, err
 		}
+		featured, err := service.GetFeatured(ctx)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
 		resp := &response.HomeFeaturedOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Home featured loaded", toFeaturedData(service.GetFeatured()))
+		resp.Body = response.NewSuccess(http.StatusOK, "Home featured loaded", toFeaturedData(featured))
 		return resp, nil
 	}
 }

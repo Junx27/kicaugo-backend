@@ -42,6 +42,8 @@ type fakeRepository struct {
 	stopEventID        int64
 	activeStreaming    *entities.ActiveEventStreaming
 	activeStreamingErr error
+	randomFeatured     *entities.Event
+	randomFeaturedErr  error
 }
 
 func (f *fakeRepository) Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error) {
@@ -95,6 +97,10 @@ func (f *fakeRepository) StopStreaming(ctx context.Context, eventID int64) (enti
 
 func (f *fakeRepository) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
 	return f.activeStreaming, f.activeStreamingErr
+}
+
+func (f *fakeRepository) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+	return f.randomFeatured, f.randomFeaturedErr
 }
 
 func freshCandidate() entities.OriginCandidate {

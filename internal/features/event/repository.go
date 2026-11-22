@@ -29,6 +29,7 @@ type Repository interface {
 	UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
 	StopStreaming(ctx context.Context, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
+	GetRandomFeatured(ctx context.Context) (*entities.Event, error)
 }
 
 // db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
@@ -369,4 +370,27 @@ func (r *repository) GetActiveStreaming(ctx context.Context) (*entities.ActiveEv
 		return nil, fmt.Errorf("get active streaming: %w", err)
 	}
 	return &out, nil
+}
+
+// GetRandomFeatured mengambil satu event acak yang eligible untuk featured.
+func (r *repository) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+	const query = `SELECT e.id, e.organizer_id, e.title, e.slug, e.venue, e.city, COALESCE(e.province, '') AS province,
+		e.city_id, e.province_id, e.latitude, e.longitude, e.start_date, e.end_date, e.status, e.banner_url
+		FROM events e
+		WHERE e.status IN ('published', 'ongoing')
+		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
+		ORDER BY RANDOM()
+		LIMIT 1`
+	var e entities.Event
+	err := r.db.QueryRow(ctx, query).Scan(
+		&e.ID, &e.OrganizerID, &e.Title, &e.Slug, &e.Venue, &e.City, &e.Province,
+		&e.CityID, &e.ProvinceID, &e.Latitude, &e.Longitude, &e.StartDate, &e.EndDate, &e.Status, &e.BannerURL,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get random featured event: %w", err)
+	}
+	return &e, nil
 }

@@ -39,11 +39,11 @@ func (f *fakeService) Get(ctx context.Context, identifier string, opts Options) 
 	return f.view, f.err
 }
 
-func (f *fakeService) GetFeatured() Featured         { return f.featured }
-func (f *fakeService) GetUpcoming() Upcoming         { return f.upcoming }
-func (f *fakeService) GetStats() Stats               { return f.stats }
-func (f *fakeService) GetActiveTicket() ActiveTicket { return f.activeTicket }
-func (f *fakeService) GetSchedules() []Schedule      { return f.schedules }
+func (f *fakeService) GetFeatured(ctx context.Context) (Featured, error) { return f.featured, f.err }
+func (f *fakeService) GetUpcoming() Upcoming                             { return f.upcoming }
+func (f *fakeService) GetStats() Stats                                   { return f.stats }
+func (f *fakeService) GetActiveTicket() ActiveTicket                     { return f.activeTicket }
+func (f *fakeService) GetSchedules() []Schedule                          { return f.schedules }
 func (f *fakeService) GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error) {
 	return f.birdCategories, f.birdErr
 }
@@ -276,6 +276,8 @@ func TestGetHomeFeaturedHandler(t *testing.T) {
 			Message string `json:"message"`
 			Data    struct {
 				Title     string `json:"title"`
+				Distance  string `json:"distance"`
+				Prize     string `json:"prize"`
 				Attendees struct {
 					Initials []string `json:"initials"`
 					Others   int      `json:"others"`
