@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 )
@@ -25,6 +26,11 @@ type ProfileReader interface {
 type EventReader interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error)
 	CountOngoing(ctx context.Context) (int, error)
+}
+
+// BirdCategoryReader adalah bagian birdcategory.Service yang dipakai home.
+type BirdCategoryReader interface {
+	List(ctx context.Context) ([]entities.BirdCategory, error)
 }
 
 // View menggabungkan profil, event terdekat, sapaan, dan jumlah event berlangsung.
@@ -100,23 +106,25 @@ type Service interface {
 	GetStats() Stats
 	GetActiveTicket() ActiveTicket
 	GetSchedules() []Schedule
+	GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error)
 }
 
 // service adalah implementasi Service yang mengorkestrasi service existing.
 type service struct {
-	profiles ProfileReader
-	events   EventReader
-	now      func() time.Time
+	profiles       ProfileReader
+	events         EventReader
+	birdCategories BirdCategoryReader
+	now            func() time.Time
 }
 
-// NewService membuat service dengan service profil dan event yang sudah ada.
-func NewService(profiles ProfileReader, events EventReader) Service {
-	return NewServiceWithClock(profiles, events, time.Now)
+// NewService membuat service dengan dependency home yang sudah ada.
+func NewService(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader) Service {
+	return NewServiceWithClock(profiles, events, birdCategories, time.Now)
 }
 
 // NewServiceWithClock membuat service dengan jam yang dapat ditentukan, antara lain untuk test.
-func NewServiceWithClock(profiles ProfileReader, events EventReader, now func() time.Time) Service {
-	return &service{profiles: profiles, events: events, now: now}
+func NewServiceWithClock(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader, now func() time.Time) Service {
+	return &service{profiles: profiles, events: events, birdCategories: birdCategories, now: now}
 }
 
 // Get mengambil profil, event terdekat, dan jumlah event berlangsung untuk identifier tertentu.
@@ -159,6 +167,10 @@ func (s *service) GetActiveTicket() ActiveTicket {
 
 func (s *service) GetSchedules() []Schedule {
 	return demoSchedules()
+}
+
+func (s *service) GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error) {
+	return s.birdCategories.List(ctx)
 }
 
 func demoFeatured() Featured {

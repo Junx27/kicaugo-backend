@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	"github.com/Junx27/kicaugo-backend/internal/utils/authctx"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
@@ -89,6 +90,19 @@ func toSchedulesData(items []Schedule) []response.HomeScheduleData {
 	return data
 }
 
+func toBirdCategoriesData(items []entities.BirdCategory) []response.BirdCategoryData {
+	data := make([]response.BirdCategoryData, 0, len(items))
+	for _, item := range items {
+		data = append(data, response.BirdCategoryData{
+			ID:   item.ID,
+			Name: item.Name,
+			Slug: item.Slug,
+			Icon: item.Icon,
+		})
+	}
+	return data
+}
+
 // newGetProfileHandler membentuk handler agar dapat diuji langsung tanpa Huma.
 func newGetProfileHandler(service Service) func(context.Context, *request.HomeProfileInput) (*response.HomeOutput, error) {
 	return func(ctx context.Context, input *request.HomeProfileInput) (*response.HomeOutput, error) {
@@ -168,6 +182,22 @@ func newGetSchedulesHandler(service Service) func(context.Context, *struct{}) (*
 	}
 }
 
+func newGetBirdCategoriesHandler(service Service) func(context.Context, *struct{}) (*response.HomeBirdCategoriesOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*response.HomeBirdCategoriesOutput, error) {
+		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+			return nil, err
+		}
+		categories, err := service.GetBirdCategories(ctx)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.HomeBirdCategoriesOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Home bird categories loaded", toBirdCategoriesData(categories))
+		return resp, nil
+	}
+}
+
 // RegisterRoutes mendaftarkan route home ke Huma API.
 func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 	auth := []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)}
@@ -232,6 +262,16 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		Security:    security,
 		Middlewares: auth,
 	}, newGetSchedulesHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getHomeBirdCategories",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/home/bird-categories",
+		Summary:     "Get Home Bird Categories",
+		Tags:        []string{homeTag},
+		Security:    security,
+		Middlewares: auth,
+	}, newGetBirdCategoriesHandler(service))
 }
 
 // mapServiceError memetakan error domain ke status HTTP.

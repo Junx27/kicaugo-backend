@@ -46,10 +46,10 @@ func main() {
 	CityService := city.NewService(city.NewRepository(pool))
 	profileService := profile.NewService(profile.NewRepository(pool))
 	eventService := event.NewService(event.NewRepository(pool))
-	homeService := home.NewService(profileService, eventService)
+	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
+	homeService := home.NewService(profileService, eventService, birdCategoryService)
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
-	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
 
 	if err := server.Run(ctx, server.Dependencies{
 		Config:   &cfg,

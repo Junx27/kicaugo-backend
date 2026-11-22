@@ -41,6 +41,15 @@ func (f *fakeEventReader) CountOngoing(ctx context.Context) (int, error) {
 	return f.count, f.countErr
 }
 
+type fakeBirdCategoryReader struct {
+	items []entities.BirdCategory
+	err   error
+}
+
+func (f *fakeBirdCategoryReader) List(ctx context.Context) ([]entities.BirdCategory, error) {
+	return f.items, f.err
+}
+
 func fixedClock() func() time.Time {
 	return func() time.Time { return time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC) }
 }
@@ -51,7 +60,7 @@ func TestServiceGet(t *testing.T) {
 		nearby := event.NearbyResult{RadiusKM: 30}
 		profiles := &fakeProfileReader{view: view}
 		events := &fakeEventReader{result: nearby, count: 4}
-		svc := NewServiceWithClock(profiles, events, fixedClock())
+		svc := NewServiceWithClock(profiles, events, &fakeBirdCategoryReader{}, fixedClock())
 
 		got, err := svc.Get(context.Background(), "user@example.com", Options{
 			RadiusKM: 25, CategoryID: 3, Limit: 7,
@@ -73,7 +82,7 @@ func TestServiceGet(t *testing.T) {
 
 	t.Run("gagal membaca profil", func(t *testing.T) {
 		events := &fakeEventReader{}
-		svc := NewService(&fakeProfileReader{err: errors.New("db down")}, events)
+		svc := NewService(&fakeProfileReader{err: errors.New("db down")}, events, &fakeBirdCategoryReader{})
 		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
 			t.Error("Get() ingin error")
 		}
@@ -83,14 +92,14 @@ func TestServiceGet(t *testing.T) {
 	})
 
 	t.Run("gagal membaca event", func(t *testing.T) {
-		svc := NewService(&fakeProfileReader{}, &fakeEventReader{err: errors.New("db down")})
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{err: errors.New("db down")}, &fakeBirdCategoryReader{})
 		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
 			t.Error("Get() ingin error")
 		}
 	})
 
 	t.Run("gagal menghitung event berlangsung", func(t *testing.T) {
-		svc := NewService(&fakeProfileReader{}, &fakeEventReader{countErr: errors.New("db down")})
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{countErr: errors.New("db down")}, &fakeBirdCategoryReader{})
 		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
 			t.Error("Get() ingin error")
 		}
@@ -98,7 +107,7 @@ func TestServiceGet(t *testing.T) {
 }
 
 func TestServiceDummySections(t *testing.T) {
-	svc := NewService(&fakeProfileReader{}, &fakeEventReader{})
+	svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{})
 
 	featured := svc.GetFeatured()
 	if featured.Title == "" || len(featured.Attendees.Initials) != 2 || featured.Attendees.Others != 48 {
@@ -127,4 +136,25 @@ func TestServiceDummySections(t *testing.T) {
 	if schedules[0].Status != "available" || schedules[0].Category.Name != "Cucak Hijau" {
 		t.Errorf("schedule[0] = %+v", schedules[0])
 	}
+}
+
+func TestServiceGetBirdCategories(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		want := []entities.BirdCategory{{ID: 1, Name: "Murai Batu", Slug: "murai_batu", Icon: "murai_batu"}}
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{items: want})
+		got, err := svc.GetBirdCategories(context.Background())
+		if err != nil {
+			t.Fatalf("GetBirdCategories() error = %v", err)
+		}
+		if len(got) != 1 || got[0].Slug != "murai_batu" {
+			t.Errorf("GetBirdCategories() = %+v", got)
+		}
+	})
+
+	t.Run("gagal", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{err: errors.New("db down")})
+		if _, err := svc.GetBirdCategories(context.Background()); err == nil {
+			t.Error("GetBirdCategories() ingin error")
+		}
+	})
 }

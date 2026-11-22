@@ -20,15 +20,17 @@ import (
 )
 
 type fakeService struct {
-	view         View
-	err          error
-	identifier   string
-	opts         Options
-	featured     Featured
-	upcoming     Upcoming
-	stats        Stats
-	activeTicket ActiveTicket
-	schedules    []Schedule
+	view           View
+	err            error
+	identifier     string
+	opts           Options
+	featured       Featured
+	upcoming       Upcoming
+	stats          Stats
+	activeTicket   ActiveTicket
+	schedules      []Schedule
+	birdCategories []entities.BirdCategory
+	birdErr        error
 }
 
 func (f *fakeService) Get(ctx context.Context, identifier string, opts Options) (View, error) {
@@ -42,6 +44,9 @@ func (f *fakeService) GetUpcoming() Upcoming         { return f.upcoming }
 func (f *fakeService) GetStats() Stats               { return f.stats }
 func (f *fakeService) GetActiveTicket() ActiveTicket { return f.activeTicket }
 func (f *fakeService) GetSchedules() []Schedule      { return f.schedules }
+func (f *fakeService) GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error) {
+	return f.birdCategories, f.birdErr
+}
 
 func setupHandler(t *testing.T, svc Service) (humatest.TestAPI, *jwt.Manager) {
 	t.Helper()
@@ -394,6 +399,48 @@ func TestGetHomeSchedulesHandler(t *testing.T) {
 	})
 }
 
+func TestGetHomeBirdCategoriesHandler(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		svc := &fakeService{birdCategories: []entities.BirdCategory{{ID: 1, Name: "Murai Batu", Slug: "murai_batu", Icon: "murai_batu"}}}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/bird-categories", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
+		}
+		var body struct {
+			Message string `json:"message"`
+			Data    []struct {
+				ID   int64  `json:"id"`
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+				Icon string `json:"icon"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+			t.Fatalf("json: %v", err)
+		}
+		if body.Message != "Home bird categories loaded" || len(body.Data) != 1 || body.Data[0].Slug != "murai_batu" || body.Data[0].Icon != "murai_batu" {
+			t.Errorf("body = %+v", body)
+		}
+	})
+
+	t.Run("service error", func(t *testing.T) {
+		svc := &fakeService{birdErr: errors.New("db down")}
+		api, tokens := setupHandler(t, svc)
+		resp := api.Get("/api/v1/home/bird-categories", testutil.BearerHeader(t, tokens))
+		if resp.Code != http.StatusInternalServerError {
+			t.Errorf("status = %d, ingin 500", resp.Code)
+		}
+	})
+
+	t.Run("ditolak tanpa token", func(t *testing.T) {
+		api, _ := setupHandler(t, &fakeService{})
+		if resp := api.Get("/api/v1/home/bird-categories"); resp.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+}
+
 func TestDummyHandlersTanpaIdentitas(t *testing.T) {
 	cases := []struct {
 		name string
@@ -417,6 +464,10 @@ func TestDummyHandlersTanpaIdentitas(t *testing.T) {
 		}},
 		{name: "schedules", fn: func() error {
 			_, err := newGetSchedulesHandler(&fakeService{})(context.Background(), &struct{}{})
+			return err
+		}},
+		{name: "bird categories", fn: func() error {
+			_, err := newGetBirdCategoriesHandler(&fakeService{})(context.Background(), &struct{}{})
 			return err
 		}},
 	}

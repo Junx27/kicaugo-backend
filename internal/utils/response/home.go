@@ -100,3 +100,9 @@ type HomeSchedulesOutput struct {
 	Status int `status:"200"`
 	Body   Success[[]HomeScheduleData]
 }
+
+// HomeBirdCategoriesOutput adalah output GET /api/v1/home/bird-categories.
+type HomeBirdCategoriesOutput struct {
+	Status int `status:"200"`
+	Body   Success[[]BirdCategoryData]
+}
