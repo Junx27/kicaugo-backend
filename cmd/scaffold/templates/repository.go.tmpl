@@ -1,0 +1,110 @@
+package {{.Domain}}
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Junx27/kicaugo-backend/internal/entities"
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+)
+
+// Repository menyimpan dan mencari {{.Domain}}.
+type Repository interface {
+	List(ctx context.Context) ([]entities.{{.DomainPascal}}, error)
+	FindByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error)
+	Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+	Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error)
+	Delete(ctx context.Context, id int64) error
+}
+
+// repository adalah implementasi Repository berbasis pgxpool.
+type repository struct {
+	pool *pgxpool.Pool
+}
+
+// NewRepository membuat repository dengan connection pool yang sudah ada.
+func NewRepository(pool *pgxpool.Pool) Repository {
+	return &repository{pool: pool}
+}
+
+// List mengambil semua {{.Domain}}.
+func (r *repository) List(ctx context.Context) ([]entities.{{.DomainPascal}}, error) {
+	const query = `SELECT id, {{.FieldColumns}}, created_at FROM {{.Table}} ORDER BY id`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list {{.Domain}}: %w", err)
+	}
+	defer rows.Close()
+
+	var out []entities.{{.DomainPascal}}
+	for rows.Next() {
+		var c entities.{{.DomainPascal}}
+		if err := rows.Scan(&c.ID{{range .Fields}}, &c.{{.GoName}}{{end}}, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan {{.Domain}}: %w", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate {{.Domain}}: %w", err)
+	}
+	return out, nil
+}
+
+// FindByID mencari {{.Domain}} berdasarkan id.
+func (r *repository) FindByID(ctx context.Context, id int64) (entities.{{.DomainPascal}}, error) {
+	const query = `SELECT id, {{.FieldColumns}}, created_at FROM {{.Table}} WHERE id = $1`
+	var c entities.{{.DomainPascal}}
+	err := r.pool.QueryRow(ctx, query, id).
+		Scan(&c.ID{{range .Fields}}, &c.{{.GoName}}{{end}}, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entities.{{.DomainPascal}}{}, apperrors.ErrNotFound
+	}
+	if err != nil {
+		return entities.{{.DomainPascal}}{}, fmt.Errorf("find {{.Domain}} %d: %w", id, err)
+	}
+	return c, nil
+}
+
+// Create menyimpan {{.Domain}} baru.
+func (r *repository) Create(ctx context.Context, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
+	const query = `INSERT INTO {{.Table}} ({{.FieldColumns}}) VALUES ({{range $i, $f := .Fields}}${{add $i 1}}{{if (lt (add $i 1) (len $.Fields))}}, {{end}}{{end}}) RETURNING id, {{.FieldColumns}}, created_at`
+	var c entities.{{.DomainPascal}}
+	err := r.pool.QueryRow(ctx, query{{range .Fields}}, in.{{.GoName}}{{end}}).
+		Scan(&c.ID{{range .Fields}}, &c.{{.GoName}}{{end}}, &c.CreatedAt)
+	if err != nil {
+		return entities.{{.DomainPascal}}{}, fmt.Errorf("insert {{.Domain}}: %w", err)
+	}
+	return c, nil
+}
+
+// Update memperbarui {{.Domain}}.
+func (r *repository) Update(ctx context.Context, id int64, in entities.{{.DomainPascal}}) (entities.{{.DomainPascal}}, error) {
+	const query = `UPDATE {{.Table}} SET {{range $i, $f := .Fields}}{{$f.JSONTag}} = ${{add $i 1}}{{if (lt (add $i 1) (len $.Fields))}}, {{end}}{{end}} WHERE id = ${{add (len .Fields) 1}} RETURNING id, {{.FieldColumns}}, created_at`
+	var c entities.{{.DomainPascal}}
+	err := r.pool.QueryRow(ctx, query, {{range .Fields}}in.{{.GoName}}, {{end}}id).
+		Scan(&c.ID{{range .Fields}}, &c.{{.GoName}}{{end}}, &c.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entities.{{.DomainPascal}}{}, apperrors.ErrNotFound
+		}
+		return entities.{{.DomainPascal}}{}, fmt.Errorf("update {{.Domain}} %d: %w", id, err)
+	}
+	return c, nil
+}
+
+// Delete menghapus {{.Domain}}.
+func (r *repository) Delete(ctx context.Context, id int64) error {
+	const query = `DELETE FROM {{.Table}} WHERE id = $1`
+	tag, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete {{.Domain}} %d: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperrors.ErrNotFound
+	}
+	return nil
+}

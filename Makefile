@@ -1,7 +1,7 @@
 # KicauGo Backend Makefile
 # Usage: make <target>
 
-.PHONY: help up down build logs test test-race migrate shell clean lint migration index seed
+.PHONY: help up down build logs test test-race migrate shell clean lint migration index seed scaffold
 
 # Default target
 help:
@@ -19,6 +19,7 @@ help:
 	@echo "  migration    - Create new migration file (NAME=<name>)"
 	@echo "  index        - Create new index file (NAME=<name>)"
 	@echo "  seed         - Create new seeder file (NAME=<name>)"
+	@echo "  scaffold     - Generate CRUD feature (NAME=<domain> FIELDS=\"Name:string,Price:int\")"
 	@echo ""
 	@echo "API Documentation (Huma built-in):"
 	@echo "  http://localhost:8080/docs     - Scalar UI"
@@ -56,9 +57,11 @@ shell:
 clean:
 	docker compose down -v --rmi all --remove-orphans
 
-# Linting (requires golangci-lint)
-lint:
-	golangci-lint run ./...
+# Scaffold Generator
+# Usage: make scaffold NAME=<domain> FIELDS="Name:string,Price:int"
+scaffold:
+	@if [ -z "$(NAME)" ]; then echo "Usage: make scaffold NAME=<domain> FIELDS=\"Name:string,Price:int\""; exit 1; fi
+	go run ./cmd/scaffold -name=$(NAME) -fields="$(FIELDS)"
 
 # Migration, Index & Seeder Generator
 # Usage: make migration NAME=create_users_table

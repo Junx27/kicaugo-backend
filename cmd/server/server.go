@@ -18,6 +18,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
+	// scaffold:imports
 )
 
 const (
@@ -31,8 +32,9 @@ const (
 
 // Dependencies berisi konfigurasi dan service yang dibutuhkan server.
 type Dependencies struct {
-	Config         *config.Config
-	Tokens         *jwt.Manager
+	Config *config.Config
+	Tokens *jwt.Manager
+	// scaffold:deps
 	Auth           auth.AuthService
 	BirdCategories birdcategory.Service
 }
@@ -45,6 +47,7 @@ func Run(ctx context.Context, deps Dependencies) error {
 	api := humachi.New(router, newHumaConfig(deps.Config))
 	auth.RegisterRoutes(api, deps.Auth, deps.Tokens)
 	birdcategory.RegisterRoutes(api, deps.BirdCategories)
+	// scaffold:routes
 	router.Get("/health", healthHandler)
 
 	httpServer := &http.Server{

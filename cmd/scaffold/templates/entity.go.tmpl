@@ -1,0 +1,10 @@
+package entities
+
+import "time"
+
+// {{.DomainPascal}} adalah entitas {{.Domain}}.
+type {{.DomainPascal}} struct {
+	ID        int64
+{{range .Fields}}	{{.GoName}} {{.GoType}}
+{{end}}	CreatedAt time.Time
+}

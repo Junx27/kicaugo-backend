@@ -1,0 +1,6 @@
+-- Migration: create {{.Table}} table
+CREATE TABLE IF NOT EXISTS {{.Table}} (
+    id          BIGSERIAL PRIMARY KEY,
+{{range .Fields}}    {{.JSONTag}}    {{.SQLType}} NOT NULL,
+{{end}}    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
