@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
@@ -24,6 +25,8 @@ func (f *fakeProfileReader) Get(ctx context.Context, identifier string) (profile
 type fakeEventReader struct {
 	result     event.NearbyResult
 	err        error
+	count      int
+	countErr   error
 	identifier string
 	opts       Options
 }
@@ -34,20 +37,30 @@ func (f *fakeEventReader) ListNearby(ctx context.Context, identifier string, rad
 	return f.result, f.err
 }
 
+func (f *fakeEventReader) CountOngoing(ctx context.Context) (int, error) {
+	return f.count, f.countErr
+}
+
+func fixedClock() func() time.Time {
+	return func() time.Time { return time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC) }
+}
+
 func TestServiceGet(t *testing.T) {
 	t.Run("berhasil menggabungkan profil dan event", func(t *testing.T) {
 		view := profile.ProfileView{Profile: entities.UserProfile{FullName: "Kicau Mania"}}
 		nearby := event.NearbyResult{RadiusKM: 30}
 		profiles := &fakeProfileReader{view: view}
-		events := &fakeEventReader{result: nearby}
+		events := &fakeEventReader{result: nearby, count: 4}
+		svc := NewServiceWithClock(profiles, events, fixedClock())
 
-		got, err := NewService(profiles, events).Get(context.Background(), "user@example.com", Options{
+		got, err := svc.Get(context.Background(), "user@example.com", Options{
 			RadiusKM: 25, CategoryID: 3, Limit: 7,
 		})
 		if err != nil {
 			t.Fatalf("Get() error = %v", err)
 		}
-		if got.Profile.Profile.FullName != "Kicau Mania" || got.Nearby.RadiusKM != 30 {
+		if got.Profile.Profile.FullName != "Kicau Mania" || got.Nearby.RadiusKM != 30 ||
+			got.Greeting != greetingAfternoon || got.OngoingEventsCount != 4 {
 			t.Errorf("Get() = %+v", got)
 		}
 		if profiles.identifier != "user@example.com" || events.identifier != "user@example.com" {
@@ -71,6 +84,13 @@ func TestServiceGet(t *testing.T) {
 
 	t.Run("gagal membaca event", func(t *testing.T) {
 		svc := NewService(&fakeProfileReader{}, &fakeEventReader{err: errors.New("db down")})
+		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
+			t.Error("Get() ingin error")
+		}
+	})
+
+	t.Run("gagal menghitung event berlangsung", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{countErr: errors.New("db down")})
 		if _, err := svc.Get(context.Background(), "user@example.com", Options{}); err == nil {
 			t.Error("Get() ingin error")
 		}

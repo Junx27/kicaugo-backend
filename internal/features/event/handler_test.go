@@ -33,6 +33,10 @@ func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusK
 	return f.result, f.err
 }
 
+func (f *fakeService) CountOngoing(ctx context.Context) (int, error) {
+	return 0, nil
+}
+
 func newTestTokens() *jwt.Manager {
 	return jwt.NewManager([]byte("rahasia-untuk-test"), time.Hour)
 }

@@ -71,6 +71,8 @@ func sampleView() View {
 				Status: "published", DistanceKM: 3.14159,
 			}},
 		},
+		Greeting:           greetingNoon,
+		OngoingEventsCount: 3,
 	}
 }
 
@@ -88,6 +90,7 @@ func TestGetHomeProfileHandler(t *testing.T) {
 			Message string `json:"message"`
 			Data    struct {
 				Profile struct {
+					Greeting           string  `json:"greeting"`
 					FullName           string  `json:"full_name"`
 					AvatarURL          *string `json:"avatar_url"`
 					SearchRadiusKM     int     `json:"search_radius_km"`
@@ -105,9 +108,10 @@ func TestGetHomeProfileHandler(t *testing.T) {
 					} `json:"city"`
 				} `json:"profile"`
 				Nearby struct {
-					OriginSource string `json:"origin_source"`
-					RadiusKM     int    `json:"radius_km"`
-					Events       []struct {
+					OriginSource       string `json:"origin_source"`
+					RadiusKM           int    `json:"radius_km"`
+					OngoingEventsCount int    `json:"ongoing_events_count"`
+					Events             []struct {
 						ID         int64   `json:"id"`
 						DistanceKM float64 `json:"distance_km"`
 						StartDate  *string `json:"start_date"`
@@ -122,6 +126,9 @@ func TestGetHomeProfileHandler(t *testing.T) {
 			t.Errorf("status = %d, message = %q", body.Status, body.Message)
 		}
 		p := body.Data.Profile
+		if p.Greeting != greetingNoon {
+			t.Errorf("greeting = %q, ingin %q", p.Greeting, greetingNoon)
+		}
 		if p.FullName != "Kicau Mania" || p.AvatarURL == nil || *p.AvatarURL != "https://cdn.example.com/avatar.png" ||
 			p.SearchRadiusKM != 30 || p.IsComplete || len(p.MissingFields) != 1 || p.MissingFields[0] != "city_id" {
 			t.Errorf("profile = %+v", p)
@@ -131,6 +138,9 @@ func TestGetHomeProfileHandler(t *testing.T) {
 			t.Errorf("city/favorites = %+v", p)
 		}
 		n := body.Data.Nearby
+		if n.OngoingEventsCount != 3 {
+			t.Errorf("ongoing_events_count = %d, ingin 3", n.OngoingEventsCount)
+		}
 		if n.OriginSource != event.OriginCurrentLocation || n.RadiusKM != 30 || len(n.Events) != 1 {
 			t.Fatalf("nearby = %+v", n)
 		}

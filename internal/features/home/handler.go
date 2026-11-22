@@ -21,6 +21,7 @@ func toData(view View) response.HomeData {
 	profileData := profile.ToData(view.Profile)
 	return response.HomeData{
 		Profile: response.HomeProfileData{
+			Greeting:           view.Greeting,
 			FullName:           profileData.FullName,
 			AvatarURL:          profileData.AvatarURL,
 			City:               profileData.City,
@@ -29,7 +30,10 @@ func toData(view View) response.HomeData {
 			IsComplete:         profileData.IsComplete,
 			MissingFields:      profileData.MissingFields,
 		},
-		Nearby: event.ToData(view.Nearby),
+		Nearby: response.HomeNearbyData{
+			NearbyEventsData:   event.ToData(view.Nearby),
+			OngoingEventsCount: view.OngoingEventsCount,
+		},
 	}
 }
 

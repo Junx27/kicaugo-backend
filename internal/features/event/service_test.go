@@ -11,15 +11,17 @@ import (
 )
 
 type fakeRepository struct {
-	candidate  entities.OriginCandidate
-	originErr  error
-	events     []entities.Event
-	listErr    error
-	originID   string
-	listOrigin entities.NearbyOrigin
-	listRadius int
-	listCat    int64
-	listLimit  int
+	candidate    entities.OriginCandidate
+	originErr    error
+	events       []entities.Event
+	listErr      error
+	ongoingCount int
+	countErr     error
+	originID     string
+	listOrigin   entities.NearbyOrigin
+	listRadius   int
+	listCat      int64
+	listLimit    int
 }
 
 func (f *fakeRepository) Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error) {
@@ -33,6 +35,10 @@ func (f *fakeRepository) ListNearby(ctx context.Context, origin entities.NearbyO
 	f.listCat = categoryID
 	f.listLimit = limit
 	return f.events, f.listErr
+}
+
+func (f *fakeRepository) CountOngoing(ctx context.Context) (int, error) {
+	return f.ongoingCount, f.countErr
 }
 
 func freshCandidate() entities.OriginCandidate {
@@ -115,6 +121,22 @@ func TestServiceListNearby(t *testing.T) {
 		svc := NewService(&fakeRepository{candidate: freshCandidate(), listErr: errors.New("db down")})
 		if _, err := svc.ListNearby(context.Background(), "x", 0, 0, 20); err == nil {
 			t.Error("ListNearby() ingin error")
+		}
+	})
+}
+
+func TestServiceCountOngoing(t *testing.T) {
+	t.Run("meneruskan jumlah dari repository", func(t *testing.T) {
+		count, err := NewService(&fakeRepository{ongoingCount: 4}).CountOngoing(context.Background())
+		if err != nil || count != 4 {
+			t.Errorf("CountOngoing() = %d, %v; ingin 4, nil", count, err)
+		}
+	})
+
+	t.Run("gagal menghitung dari repository", func(t *testing.T) {
+		svc := NewService(&fakeRepository{countErr: errors.New("db down")})
+		if _, err := svc.CountOngoing(context.Background()); err == nil {
+			t.Error("CountOngoing() ingin error")
 		}
 	})
 }

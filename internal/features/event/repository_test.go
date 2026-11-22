@@ -171,6 +171,30 @@ func TestRepositoryListNearby(t *testing.T) {
 	}
 }
 
+func TestRepositoryCountOngoing(t *testing.T) {
+	repo, ctx, conn := newTestRepository(t)
+	organizerID := createOrganizer(t, conn, ctx)
+
+	before, err := repo.CountOngoing(ctx)
+	if err != nil {
+		t.Fatalf("CountOngoing() awal error = %v", err)
+	}
+	future := time.Now().AddDate(0, 0, 2)
+	expired := time.Now().AddDate(0, 0, -2)
+	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-" + testSuffix(t), status: "ongoing"})
+	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "berlangsung-akhir-" + testSuffix(t), status: "ongoing", endDate: &future})
+	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "selesai-" + testSuffix(t), status: "ongoing", endDate: &expired})
+	insertEvent(t, conn, ctx, organizerID, eventFixture{slug: "diterbitkan-" + testSuffix(t), status: "published"})
+
+	after, err := repo.CountOngoing(ctx)
+	if err != nil {
+		t.Fatalf("CountOngoing() error = %v", err)
+	}
+	if after-before != 2 {
+		t.Errorf("jumlah event berlangsung bertambah %d, ingin 2", after-before)
+	}
+}
+
 func haversineKM(lat1, lng1, lat2, lng2 float64) float64 {
 	const toRad = math.Pi / 180
 	dLat := (lat2 - lat1) * toRad
@@ -237,5 +261,8 @@ func TestRepositoryErrorPaths(t *testing.T) {
 	}
 	if _, err := repo.ListNearby(canceled, entities.NearbyOrigin{Latitude: -6.2, Longitude: 106.8}, 50, 0, 20); err == nil {
 		t.Error("ListNearby() dengan konteks dibatalkan ingin error")
+	}
+	if _, err := repo.CountOngoing(canceled); err == nil {
+		t.Error("CountOngoing() dengan konteks dibatalkan ingin error")
 	}
 }

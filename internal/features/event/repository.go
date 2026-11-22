@@ -13,10 +13,11 @@ import (
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
-// Repository menyediakan asal pencarian dan daftar event terdekat.
+// Repository menyediakan asal pencarian, daftar event terdekat, dan jumlah event berlangsung.
 type Repository interface {
 	Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error)
 	ListNearby(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.Event, error)
+	CountOngoing(ctx context.Context) (int, error)
 }
 
 // db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
@@ -63,6 +64,17 @@ func (r *repository) Origin(ctx context.Context, identifier string) (entities.Or
 		return entities.OriginCandidate{}, fmt.Errorf("get nearby origin: %w", err)
 	}
 	return candidate, nil
+}
+
+// CountOngoing menghitung event berstatus ongoing yang belum terlewat tanggal akhirnya.
+func (r *repository) CountOngoing(ctx context.Context) (int, error) {
+	const query = `SELECT COUNT(*) FROM events
+		WHERE status = 'ongoing' AND (end_date IS NULL OR end_date >= CURRENT_DATE)`
+	var count int
+	if err := r.db.QueryRow(ctx, query).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count ongoing events: %w", err)
+	}
+	return count, nil
 }
 
 // nearbyQuery menghitung jarak Haversine dalam satu helper SQL terparameterisasi.

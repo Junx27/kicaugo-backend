@@ -19,6 +19,7 @@ type NearbyResult struct {
 // Service berisi aturan pencarian event terdekat.
 type Service interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error)
+	CountOngoing(ctx context.Context) (int, error)
 }
 
 // service adalah implementasi Service.
@@ -30,6 +31,11 @@ type service struct {
 // NewService membuat service dengan repository.
 func NewService(repo Repository) Service {
 	return &service{repo: repo, now: time.Now}
+}
+
+// CountOngoing meneruskan penghitungan event yang sedang berlangsung ke repository.
+func (s *service) CountOngoing(ctx context.Context) (int, error) {
+	return s.repo.CountOngoing(ctx)
 }
 
 // ListNearby menentukan asal pencarian, lalu mengambil event dalam radius.
