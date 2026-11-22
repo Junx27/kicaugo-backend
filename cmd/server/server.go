@@ -17,6 +17,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/auth"
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
 	"github.com/Junx27/kicaugo-backend/internal/features/city"
+	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
@@ -38,6 +39,7 @@ type Dependencies struct {
 	Tokens   *jwt.Manager
 	Province province.Service
 	City     city.Service
+	Profile  profile.Service
 	// scaffold:deps
 	Auth           auth.AuthService
 	BirdCategories birdcategory.Service
@@ -53,6 +55,7 @@ func Run(ctx context.Context, deps Dependencies) error {
 	birdcategory.RegisterRoutes(api, deps.BirdCategories, deps.Tokens)
 	province.RegisterRoutes(api, deps.Province)
 	city.RegisterRoutes(api, deps.City)
+	profile.RegisterRoutes(api, deps.Profile, deps.Tokens)
 	// scaffold:routes
 	router.Get("/health", healthHandler)
 
