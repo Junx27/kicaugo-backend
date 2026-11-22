@@ -13,6 +13,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/database"
 	"github.com/Junx27/kicaugo-backend/internal/features/auth"
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
+	"github.com/Junx27/kicaugo-backend/internal/features/city"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	// scaffold:imports
@@ -39,6 +40,7 @@ func main() {
 
 	tokens := jwt.NewManager([]byte(cfg.JWTSecret), cfg.TokenTTL)
 	ProvinceService := province.NewService(province.NewRepository(pool))
+	CityService := city.NewService(city.NewRepository(pool))
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
@@ -47,6 +49,7 @@ func main() {
 		Config:   &cfg,
 		Tokens:   tokens,
 		Province: ProvinceService,
+		City:     CityService,
 		// scaffold:deps
 		Auth:           authService,
 		BirdCategories: birdCategoryService,
