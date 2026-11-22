@@ -1,4 +1,4 @@
-// Package response berisi format standar untuk semua response API.
+// Package response menyediakan format standar response API.
 package response
 
 import (
@@ -38,14 +38,3 @@ func NewError(status int, message string, errs ...*huma.ErrorDetail) *Error {
 		Errors:  errs,
 	}
 }
-
-// StandardError implements huma.StatusError for consistent error format.
-type StandardError struct {
-	Status  int                 `json:"status"`
-	Message string              `json:"message"`
-	Data    any                 `json:"data"`
-	Errors  []*huma.ErrorDetail `json:"errors,omitempty"`
-}
-
-func (e *StandardError) Error() string  { return e.Message }
-func (e *StandardError) GetStatus() int { return e.Status }

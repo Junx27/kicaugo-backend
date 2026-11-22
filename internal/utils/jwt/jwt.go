@@ -1,54 +1,57 @@
-package auth
+// Package jwt mengelola penerbitan dan validasi token JWT HS256.
+package jwt
 
 import (
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	jwtlib "github.com/golang-jwt/jwt/v5"
+
+	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
 // Claims adalah klaim token yang dipakai lintas handler.
 type Claims struct {
-	jwt.RegisteredClaims
+	jwtlib.RegisteredClaims
 	Name string `json:"name"`
 }
 
-// TokenManager menerbitkan dan memvalidasi JWT HS256.
-type TokenManager struct {
+// Manager menerbitkan dan memvalidasi JWT HS256.
+type Manager struct {
 	secret []byte
 	ttl    time.Duration
 }
 
-// NewTokenManager membuat pengelola token dengan secret dan masa berlaku tertentu.
-func NewTokenManager(secret []byte, ttl time.Duration) *TokenManager {
-	return &TokenManager{secret: secret, ttl: ttl}
+// NewManager membuat pengelola token dengan secret dan masa berlaku tertentu.
+func NewManager(secret []byte, ttl time.Duration) *Manager {
+	return &Manager{secret: secret, ttl: ttl}
 }
 
-// Issue membuat token untuk pengguna.
-func (m *TokenManager) Issue(user User) (string, error) {
+// Issue membuat token untuk subject dan name.
+func (m *Manager) Issue(subject, name string) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   user.Identifier,
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
+		RegisteredClaims: jwtlib.RegisteredClaims{
+			Subject:   subject,
+			IssuedAt:  jwtlib.NewNumericDate(now),
+			ExpiresAt: jwtlib.NewNumericDate(now.Add(m.ttl)),
 		},
-		Name: user.Name,
+		Name: name,
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.secret)
+	return jwtlib.NewWithClaims(jwtlib.SigningMethodHS256, claims).SignedString(m.secret)
 }
 
-// Parse memverifikasi token dan mengembalikan identitas pengguna.
-func (m *TokenManager) Parse(raw string) (User, error) {
+// Parse memverifikasi token dan mengembalikan klaim.
+func (m *Manager) Parse(raw string) (Claims, error) {
 	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (any, error) {
-		if token.Method != jwt.SigningMethodHS256 {
+	token, err := jwtlib.ParseWithClaims(raw, claims, func(token *jwtlib.Token) (any, error) {
+		if token.Method != jwtlib.SigningMethodHS256 {
 			return nil, errors.New("unexpected signing method")
 		}
 		return m.secret, nil
 	})
 	if err != nil || !token.Valid || claims.Subject == "" {
-		return User{}, ErrInvalidToken
+		return Claims{}, apperrors.ErrInvalidToken
 	}
-	return User{Identifier: claims.Subject, Name: claims.Name}, nil
+	return *claims, nil
 }
