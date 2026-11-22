@@ -40,6 +40,11 @@ func AuthMiddleware[T any](tokens TokenParser[T]) func(ctx huma.Context, next fu
 	}
 }
 
+// WithUser menyimpan identitas pengguna ke context. Dipakai middleware dan test.
+func WithUser(ctx context.Context, user any) context.Context {
+	return context.WithValue(ctx, userKey, user)
+}
+
 // UserFromContext mengambil identitas pengguna yang sudah diverifikasi dari Huma context.
 func UserFromContext[T any](ctx context.Context) (T, bool) {
 	val := ctx.Value(userKey)

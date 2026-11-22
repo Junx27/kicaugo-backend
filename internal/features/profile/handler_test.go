@@ -289,12 +289,6 @@ func TestReplaceFavoritesHandler(t *testing.T) {
 	})
 }
 
-func TestIdentifierFromContext(t *testing.T) {
-	if _, err := identifierFromContext(context.Background()); err == nil {
-		t.Error("identifierFromContext() tanpa claims ingin error")
-	}
-}
-
 // TestEndpointDenganSubjectKosong menutup cabang pertahanan pada keempat handler
 // saat token valid tetapi tidak membawa identifier pengguna.
 func TestEndpointDenganSubjectKosong(t *testing.T) {

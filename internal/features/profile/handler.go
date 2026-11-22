@@ -8,20 +8,13 @@ import (
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
+	"github.com/Junx27/kicaugo-backend/internal/utils/authctx"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	"github.com/Junx27/kicaugo-backend/internal/utils/request"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
-
-func identifierFromContext(ctx context.Context) (string, error) {
-	claims, ok := middlewares.UserFromContext[jwt.Claims](ctx)
-	if !ok || claims.Subject == "" {
-		return "", apphttp.Unauthorized("Authentication required")
-	}
-	return claims.Subject, nil
-}
 
 func toProfileData(view ProfileView) response.ProfileData {
 	p := view.Profile
@@ -70,7 +63,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		Summary: "Get My Profile", Tags: []string{"profile"},
 		Security: security, Middlewares: authMiddleware,
 	}, func(ctx context.Context, input *struct{}) (*response.ProfileOutput, error) {
-		identifier, err := identifierFromContext(ctx)
+		identifier, err := authctx.IdentifierFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +83,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		Summary: "Update My Profile", Tags: []string{"profile"},
 		Security: security, Middlewares: authMiddleware,
 	}, func(ctx context.Context, input *request.UpdateProfileInput) (*response.ProfileMutationOutput, error) {
-		identifier, err := identifierFromContext(ctx)
+		identifier, err := authctx.IdentifierFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +107,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		Summary: "Update My Current Location", Tags: []string{"profile"},
 		Security: security, Middlewares: authMiddleware,
 	}, func(ctx context.Context, input *request.CurrentLocationInput) (*response.ProfileMutationOutput, error) {
-		identifier, err := identifierFromContext(ctx)
+		identifier, err := authctx.IdentifierFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +124,7 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager) {
 		Summary: "Replace My Favorite Categories", Tags: []string{"profile"},
 		Security: security, Middlewares: authMiddleware,
 	}, func(ctx context.Context, input *request.FavoriteCategoriesInput) (*response.ProfileMutationOutput, error) {
-		identifier, err := identifierFromContext(ctx)
+		identifier, err := authctx.IdentifierFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
