@@ -34,7 +34,7 @@ func RegisterRoutes(api apphttp.API, service Service) {
 			middlewares.CachePublic(),
 		},
 	}, func(ctx context.Context, input *request.ListCitiesInput) (*response.CityListOutput, error) {
-		items, err := service.ListByProvince(ctx, input.ProvinceID, input.Q)
+		items, err := service.ListByProvince(ctx, input.ProvinceID, input.Query)
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
