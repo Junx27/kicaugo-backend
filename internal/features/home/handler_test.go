@@ -88,7 +88,7 @@ func sampleView() View {
 }
 
 func TestGetHomeProfileHandler(t *testing.T) {
-	t.Run("berhasil dengan ringkasan profil dan event", func(t *testing.T) {
+	t.Run("berhasil dengan ringkasan sederhana", func(t *testing.T) {
 		svc := &fakeService{view: sampleView()}
 		api, tokens := setupHandler(t, svc)
 
@@ -96,38 +96,15 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		if resp.Code != http.StatusOK {
 			t.Fatalf("status = %d, ingin 200; body = %s", resp.Code, resp.Body.String())
 		}
+
 		var body struct {
 			Status  int    `json:"status"`
 			Message string `json:"message"`
 			Data    struct {
-				Profile struct {
-					Greeting           string  `json:"greeting"`
-					FullName           string  `json:"full_name"`
-					AvatarURL          *string `json:"avatar_url"`
-					SearchRadiusKM     int     `json:"search_radius_km"`
-					FavoriteCategories []struct {
-						ID   int64  `json:"id"`
-						Name string `json:"name"`
-					} `json:"favorite_categories"`
-					IsComplete    bool     `json:"is_complete"`
-					MissingFields []string `json:"missing_fields"`
-					City          *struct {
-						Name     string `json:"name"`
-						Province struct {
-							Name string `json:"name"`
-						} `json:"province"`
-					} `json:"city"`
-				} `json:"profile"`
-				Nearby struct {
-					OriginSource       string `json:"origin_source"`
-					RadiusKM           int    `json:"radius_km"`
-					OngoingEventsCount int    `json:"ongoing_events_count"`
-					Events             []struct {
-						ID         int64   `json:"id"`
-						DistanceKM float64 `json:"distance_km"`
-						StartDate  *string `json:"start_date"`
-					} `json:"events"`
-				} `json:"nearby"`
+				Name      string  `json:"name"`
+				Avatar    *string `json:"avatar"`
+				Message   string  `json:"message"`
+				LiveCount int     `json:"live_count"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
@@ -136,28 +113,11 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		if body.Status != http.StatusOK || body.Message != "Home profile loaded" {
 			t.Errorf("status = %d, message = %q", body.Status, body.Message)
 		}
-		p := body.Data.Profile
-		if p.Greeting != greetingNoon {
-			t.Errorf("greeting = %q, ingin %q", p.Greeting, greetingNoon)
+		if body.Data.Name != "Kicau Mania" || body.Data.Avatar == nil || *body.Data.Avatar != "https://cdn.example.com/avatar.png" {
+			t.Errorf("data = %+v", body.Data)
 		}
-		if p.FullName != "Kicau Mania" || p.AvatarURL == nil || *p.AvatarURL != "https://cdn.example.com/avatar.png" ||
-			p.SearchRadiusKM != 30 || p.IsComplete || len(p.MissingFields) != 1 || p.MissingFields[0] != "city_id" {
-			t.Errorf("profile = %+v", p)
-		}
-		if p.City == nil || p.City.Name != "Banda Aceh" || p.City.Province.Name != "Aceh" ||
-			len(p.FavoriteCategories) != 1 || p.FavoriteCategories[0].Name != "Murai" {
-			t.Errorf("city/favorites = %+v", p)
-		}
-		n := body.Data.Nearby
-		if n.OngoingEventsCount != 3 {
-			t.Errorf("ongoing_events_count = %d, ingin 3", n.OngoingEventsCount)
-		}
-		if n.OriginSource != event.OriginCurrentLocation || n.RadiusKM != 30 || len(n.Events) != 1 {
-			t.Fatalf("nearby = %+v", n)
-		}
-		if n.Events[0].ID != 7 || n.Events[0].DistanceKM != 3.1 ||
-			n.Events[0].StartDate == nil || *n.Events[0].StartDate != "2026-12-01" {
-			t.Errorf("event = %+v", n.Events[0])
+		if body.Data.Message != greetingNoon || body.Data.LiveCount != 3 {
+			t.Errorf("message/live_count = %q/%d", body.Data.Message, body.Data.LiveCount)
 		}
 		if svc.identifier != testutil.TestIdentifier || svc.opts != (Options{RadiusKM: 25, CategoryID: 2, Limit: 3}) {
 			t.Errorf("identifier = %q, opts = %+v", svc.identifier, svc.opts)
@@ -167,12 +127,11 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		if err := json.Unmarshal(resp.Body.Bytes(), &raw); err != nil {
 			t.Fatalf("body bukan JSON: %v", err)
 		}
-		profileData := raw["data"].(map[string]any)["profile"].(map[string]any)
-		if _, ok := profileData["phone"]; ok {
-			t.Error("phone tidak boleh diekspos di home")
-		}
-		if _, ok := profileData["current_location"]; ok {
-			t.Error("current_location tidak boleh diekspos di home")
+		data := raw["data"].(map[string]any)
+		for _, key := range []string{"profile", "nearby", "phone", "current_location"} {
+			if _, ok := data[key]; ok {
+				t.Errorf("field %q tidak boleh ada di response sederhana", key)
+			}
 		}
 	})
 
@@ -187,19 +146,16 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		}
 		var body struct {
 			Data struct {
-				Nearby struct {
-					OriginSource string  `json:"origin_source"`
-					Hint         *string `json:"hint"`
-					Events       []any   `json:"events"`
-				} `json:"nearby"`
+				Name      string `json:"name"`
+				Message   string `json:"message"`
+				LiveCount int    `json:"live_count"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 			t.Fatalf("body bukan JSON: %v", err)
 		}
-		if body.Data.Nearby.OriginSource != "none" || body.Data.Nearby.Hint == nil ||
-			*body.Data.Nearby.Hint != event.HintLocationNotSet || len(body.Data.Nearby.Events) != 0 {
-			t.Errorf("nearby = %+v", body.Data.Nearby)
+		if body.Data.Name != "" || body.Data.LiveCount != 0 {
+			t.Errorf("data = %+v", body.Data)
 		}
 		if svc.opts != (Options{Limit: 5}) {
 			t.Errorf("opts = %+v, ingin limit 5", svc.opts)

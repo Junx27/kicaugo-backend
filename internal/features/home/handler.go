@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Junx27/kicaugo-backend/internal/features/event"
-	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	"github.com/Junx27/kicaugo-backend/internal/utils/authctx"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
@@ -21,24 +19,13 @@ const (
 	bearerAuthSecurityName = "bearerAuth"
 )
 
-// toData memilih field profil yang aman untuk home dan menggabungkan data nearby.
-func toData(view View) response.HomeData {
-	profileData := profile.ToData(view.Profile)
-	return response.HomeData{
-		Profile: response.HomeProfileData{
-			Greeting:           view.Greeting,
-			FullName:           profileData.FullName,
-			AvatarURL:          profileData.AvatarURL,
-			City:               profileData.City,
-			SearchRadiusKM:     profileData.SearchRadiusKM,
-			FavoriteCategories: profileData.FavoriteCategories,
-			IsComplete:         profileData.IsComplete,
-			MissingFields:      profileData.MissingFields,
-		},
-		Nearby: response.HomeNearbyData{
-			NearbyEventsData:   event.ToData(view.Nearby),
-			OngoingEventsCount: view.OngoingEventsCount,
-		},
+// toData memilih field ringkas untuk response home profile.
+func toData(view View) response.HomeProfileData {
+	return response.HomeProfileData{
+		Name:      view.Profile.Profile.FullName,
+		Avatar:    view.Profile.Profile.AvatarURL,
+		Message:   view.Greeting,
+		LiveCount: view.OngoingEventsCount,
 	}
 }
 
