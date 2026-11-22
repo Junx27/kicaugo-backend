@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
@@ -20,10 +21,19 @@ const (
 	bearerAuthSecurityName = "bearerAuth"
 )
 
+func firstName(fullName string) string {
+	name := strings.TrimSpace(fullName)
+	if name == "" {
+		return ""
+	}
+	parts := strings.Fields(name)
+	return parts[0]
+}
+
 // toData memilih field ringkas untuk response home profile.
 func toData(view View) response.HomeProfileData {
 	return response.HomeProfileData{
-		Name:      view.Profile.Profile.FullName,
+		Name:      firstName(view.Profile.Profile.FullName),
 		Avatar:    view.Profile.Profile.AvatarURL,
 		Message:   view.Greeting,
 		LiveCount: view.OngoingEventsCount,

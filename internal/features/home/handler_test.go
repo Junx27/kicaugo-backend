@@ -118,7 +118,7 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		if body.Status != http.StatusOK || body.Message != "Home profile loaded" {
 			t.Errorf("status = %d, message = %q", body.Status, body.Message)
 		}
-		if body.Data.Name != "Kicau Mania" || body.Data.Avatar == nil || *body.Data.Avatar != "https://cdn.example.com/avatar.png" {
+		if body.Data.Name != "Kicau" || body.Data.Avatar == nil || *body.Data.Avatar != "https://cdn.example.com/avatar.png" {
 			t.Errorf("data = %+v", body.Data)
 		}
 		if body.Data.Message != greetingNoon || body.Data.LiveCount != 3 {
