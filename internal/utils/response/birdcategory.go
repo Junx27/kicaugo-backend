@@ -14,8 +14,8 @@ type BirdCategoryListOutput struct {
 	Body   Success[[]BirdCategoryPayload]
 }
 
-// BirdcategoryDeleteOutput adalah output untuk DELETE.
-type BirdcategoryDeleteOutput struct {
+// BirdCategoryDeleteOutput adalah output untuk DELETE.
+type BirdCategoryDeleteOutput struct {
 	Status int `status:"204"`
 }
 

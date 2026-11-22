@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/humatest"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/utils/response"
 )
 
 type fakeService struct {
@@ -32,8 +33,8 @@ func TestList(t *testing.T) {
 			t.Fatalf("status = %d, ingin 200; body = %s", resp.Code, resp.Body.String())
 		}
 		var body struct {
-			Status int                   `json:"status"`
-			Data   []BirdCategoryPayload `json:"data"`
+			Status int                            `json:"status"`
+			Data   []response.BirdCategoryPayload `json:"data"`
 		}
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 			t.Fatalf("body bukan JSON: %v", err)
