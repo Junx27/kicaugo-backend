@@ -11,7 +11,7 @@ import (
 
 // Repository menyimpan dan mencari city.
 type Repository interface {
-	List(ctx context.Context) ([]entities.City, error)
+	ListByProvince(ctx context.Context, provinceID int64, q string) ([]entities.City, error)
 	// scaffold:repo-interface
 }
 
@@ -25,12 +25,15 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 	return &repository{pool: pool}
 }
 
-// List mengambil semua city.
-func (r *repository) List(ctx context.Context) ([]entities.City, error) {
-	const query = `SELECT id, province_id, code, name, type, slug, latitude, longitude, created_at FROM cities ORDER BY id`
-	rows, err := r.pool.Query(ctx, query)
+// ListByProvince mengambil kabupaten/kota pada satu provinsi, opsional difilter nama.
+func (r *repository) ListByProvince(ctx context.Context, provinceID int64, q string) ([]entities.City, error) {
+	const query = `SELECT id, province_id, code, name, type, slug, latitude, longitude, created_at
+		FROM cities
+		WHERE province_id = $1 AND ($2 = '' OR lower(name) LIKE '%' || lower($2) || '%')
+		ORDER BY name, id`
+	rows, err := r.pool.Query(ctx, query, provinceID, q)
 	if err != nil {
-		return nil, fmt.Errorf("list city: %w", err)
+		return nil, fmt.Errorf("list city by province: %w", err)
 	}
 	defer rows.Close()
 

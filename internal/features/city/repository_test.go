@@ -2,60 +2,54 @@ package city
 
 import (
 	"context"
-	"errors"
+	"strings"
 	"testing"
 
-	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/testutil"
 )
 
-type mockRepository struct {
-	listFunc func(ctx context.Context) ([]entities.City, error)
-}
+func TestRepositoryListByProvince(t *testing.T) {
+	pool := testutil.OpenDB(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
 
-func (m *mockRepository) List(ctx context.Context) ([]entities.City, error) {
-	if m.listFunc != nil {
-		return m.listFunc(ctx)
+	var provinceID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM provinces WHERE code = '11'`).Scan(&provinceID); err != nil {
+		t.Fatalf("mengambil provinsi Aceh: %v", err)
 	}
-	return nil, errors.New("not implemented")
-}
 
-func (m *mockRepository) FindByID(ctx context.Context, id int64) (entities.City, error) {
-	return entities.City{}, errors.New("not implemented")
-}
-
-func (m *mockRepository) Create(ctx context.Context, in entities.City) (entities.City, error) {
-	return entities.City{}, errors.New("not implemented")
-}
-
-func (m *mockRepository) Update(ctx context.Context, id int64, in entities.City) (entities.City, error) {
-	return entities.City{}, errors.New("not implemented")
-}
-
-func (m *mockRepository) Delete(ctx context.Context, id int64) error {
-	return errors.New("not implemented")
-}
-
-func TestRepositoryList(t *testing.T) {
-	t.Run("berhasil", func(t *testing.T) {
-		repo := &mockRepository{
-			listFunc: func(ctx context.Context) ([]entities.City, error) {
-				return []entities.City{entities.City{ID: 1}}, nil
-			},
+	items, err := repo.ListByProvince(ctx, provinceID, "")
+	if err != nil {
+		t.Fatalf("ListByProvince() error = %v", err)
+	}
+	if len(items) == 0 {
+		t.Fatal("ListByProvince() ingin ada data provinsi 11")
+	}
+	for i, item := range items {
+		if item.ProvinceID != provinceID {
+			t.Errorf("item[%d].ProvinceID = %d, ingin %d", i, item.ProvinceID, provinceID)
 		}
-		got, err := repo.List(context.Background())
-		if err != nil || len(got) != 1 {
-			t.Errorf("List() = %+v, %v", got, err)
+		if i > 0 && strings.ToLower(items[i-1].Name) > strings.ToLower(item.Name) {
+			t.Errorf("urutan nama salah: %q sebelum %q", items[i-1].Name, item.Name)
 		}
-	})
+	}
 
-	t.Run("kesalahan database", func(t *testing.T) {
-		repo := &mockRepository{
-			listFunc: func(ctx context.Context) ([]entities.City, error) {
-				return nil, errors.New("db down")
-			},
+	filtered, err := repo.ListByProvince(ctx, provinceID, "Banda")
+	if err != nil {
+		t.Fatalf("ListByProvince(q) error = %v", err)
+	}
+	if len(filtered) == 0 {
+		t.Fatal("ListByProvince(q) ingin ada hasil")
+	}
+	for _, item := range filtered {
+		if !strings.Contains(strings.ToLower(item.Name), "banda") {
+			t.Errorf("nama %q tidak mengandung banda", item.Name)
 		}
-		if _, err := repo.List(context.Background()); err == nil {
-			t.Error("List() ingin error database")
-		}
-	})
+	}
+
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := repo.ListByProvince(canceled, provinceID, ""); err == nil {
+		t.Error("ListByProvince() dengan konteks dibatalkan ingin error")
+	}
 }
