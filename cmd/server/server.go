@@ -124,7 +124,7 @@ func docsAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 }
 
 func newHumaConfig(cfg *config.Config) huma.Config {
-	humaConfig := huma.DefaultConfig("KicauGo API", "1.0.0")
+	humaConfig := huma.DefaultConfig("KicauGo", "1.0.0")
 	humaConfig.CreateHooks = nil
 	humaConfig.Transformers = nil
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
