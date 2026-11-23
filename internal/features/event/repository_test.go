@@ -253,6 +253,46 @@ func TestRepositoryOrigin(t *testing.T) {
 	}
 }
 
+func TestRepositoryGetRandomFeatured(t *testing.T) {
+	repo, ctx, conn := newTestRepository(t)
+	organizerID := createOrganizer(t, conn, ctx)
+
+	// Sembunyikan event published/ongoing lain dalam transaksi ini agar hasil acak deterministik.
+	if _, err := conn.Exec(ctx, `UPDATE events SET end_date = CURRENT_DATE - INTERVAL '1 day' WHERE status IN ('published','ongoing')`); err != nil {
+		t.Fatalf("expire events: %v", err)
+	}
+
+	suffix := testSuffix(t)
+	lat, lng := -7.7, 110.3
+	address := "Jl. Test Featured"
+	var cityID int64
+	if err := conn.QueryRow(ctx, `SELECT id FROM cities ORDER BY id LIMIT 1`).Scan(&cityID); err != nil {
+		t.Fatalf("city: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `
+		INSERT INTO events (organizer_id, title, slug, venue, city, province, address, latitude, longitude, city_id, status)
+		VALUES ($1, $2, $3, 'GOR Kota', 'Bandung', 'Jawa Barat', $4, $5, $6, $7, 'published')`,
+		organizerID, "Event Featured "+suffix, "featured-"+suffix, address, lat, lng, cityID); err != nil {
+		t.Fatalf("seed featured event: %v", err)
+	}
+
+	got, err := repo.GetRandomFeatured(ctx, "nobody@example.com")
+	if err != nil {
+		t.Fatalf("GetRandomFeatured() error = %v", err)
+	}
+	if got == nil {
+		t.Fatal("GetRandomFeatured() = nil, ingin event")
+	}
+	if got.Address == nil || *got.Address != address {
+		t.Errorf("Address = %v, ingin %q", got.Address, address)
+	}
+	if got.Latitude == nil || *got.Latitude != lat {
+		t.Errorf("Latitude = %v, ingin %v", got.Latitude, lat)
+	}
+	if got.Longitude == nil || *got.Longitude != lng {
+		t.Errorf("Longitude = %v, ingin %v", got.Longitude, lng)
+	}
+}
 func TestRepositoryErrorPaths(t *testing.T) {
 	pool := testutil.OpenDB(t)
 	canceled, cancel := context.WithCancel(context.Background())
