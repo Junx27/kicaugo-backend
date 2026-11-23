@@ -64,6 +64,7 @@ func sampleView() View {
 	latitude, longitude := -6.2, 106.8
 	start := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	streamStart := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+	streamEnd := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	return View{
 		Profile: profile.ProfileView{
 			Profile: entities.UserProfile{
@@ -92,9 +93,10 @@ func sampleView() View {
 		},
 		Greeting:           greetingNoon,
 		OngoingEventsCount: 3,
+		IsOrganizer:        true,
 		ActiveStreaming: &entities.ActiveEventStreaming{
 			ID: 9, EventID: 68, EventTitle: "Lomba Kicau", EventSlug: "lomba-kicau", Venue: "GOR", City: "Sleman",
-			LinkStream: "https://youtube.com/live/abc", StartTime: streamStart, TotalViews: 12, Juara: []byte(`{"rank1":"A"}`),
+			LinkStream: "https://youtube.com/live/abc", StartTime: streamStart, EndTime: &streamEnd, TotalViews: 12, Juara: []byte(`{"rank1":"A"}`),
 		},
 	}
 }
@@ -117,11 +119,13 @@ func TestGetHomeProfileHandler(t *testing.T) {
 				Avatar          *string `json:"avatar"`
 				Message         string  `json:"message"`
 				LiveCount       int     `json:"live_count"`
+				IsOrganizer     bool    `json:"is_organizer"`
 				ActiveStreaming *struct {
-					ID         int64  `json:"id"`
-					EventID    int64  `json:"event_id"`
-					EventTitle string `json:"event_title"`
-					LinkStream string `json:"link_stream"`
+					ID         int64   `json:"id"`
+					EventID    int64   `json:"event_id"`
+					EventTitle string  `json:"event_title"`
+					LinkStream string  `json:"link_stream"`
+					EndTime    *string `json:"end_time"`
 				} `json:"active_streaming"`
 			} `json:"data"`
 		}
@@ -137,8 +141,14 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		if body.Data.Message != greetingNoon || body.Data.LiveCount != 3 {
 			t.Errorf("message/live_count = %q/%d", body.Data.Message, body.Data.LiveCount)
 		}
+		if !body.Data.IsOrganizer {
+			t.Error("is_organizer = false, ingin true")
+		}
 		if body.Data.ActiveStreaming == nil || body.Data.ActiveStreaming.EventID != 68 || body.Data.ActiveStreaming.LinkStream == "" {
 			t.Fatalf("active_streaming=%+v", body.Data.ActiveStreaming)
+		}
+		if body.Data.ActiveStreaming.EndTime == nil || *body.Data.ActiveStreaming.EndTime != time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC).Format(time.RFC3339) {
+			t.Errorf("end_time = %v", body.Data.ActiveStreaming.EndTime)
 		}
 		if svc.identifier != testutil.TestIdentifier || svc.opts != (Options{RadiusKM: 25, CategoryID: 2, Limit: 3}) {
 			t.Errorf("identifier = %q, opts = %+v", svc.identifier, svc.opts)
@@ -185,6 +195,9 @@ func TestGetHomeProfileHandler(t *testing.T) {
 		data := raw["data"].(map[string]any)
 		if _, ok := data["active_streaming"]; !ok {
 			t.Error("active_streaming harus ada (null)")
+		}
+		if v, ok := data["is_organizer"]; !ok || v != false {
+			t.Errorf("is_organizer = %v (ada=%v), ingin false", v, ok)
 		}
 		if svc.opts != (Options{Limit: 5}) {
 			t.Errorf("opts = %+v, ingin limit 5", svc.opts)
@@ -297,6 +310,12 @@ func TestGetHomeFeaturedHandler(t *testing.T) {
 		api, _ := setupHandler(t, &fakeService{})
 		if resp := api.Get("/api/v1/home/featured"); resp.Code != http.StatusUnauthorized {
 			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+	t.Run("error service", func(t *testing.T) {
+		api, tokens := setupHandler(t, &fakeService{err: errors.New("db down")})
+		if resp := api.Get("/api/v1/home/featured", testutil.BearerHeader(t, tokens)); resp.Code != http.StatusInternalServerError {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
 		}
 	})
 }
