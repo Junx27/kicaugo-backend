@@ -19,6 +19,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/organizer"
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
+	"github.com/Junx27/kicaugo-backend/internal/features/weather"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	// scaffold:imports
 )
@@ -50,6 +51,7 @@ func main() {
 	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
 	organizerService := organizer.NewService(organizer.NewRepository(pool))
 	homeService := home.NewService(profileService, eventService, birdCategoryService, organizerService)
+	weatherService := weather.NewService(weather.NewClient(cfg.WeatherAPIKey, cfg.WeatherAPIBase))
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 
@@ -63,6 +65,7 @@ func main() {
 		Event:          eventService,
 		Home:           homeService,
 		Organizer:      organizerService,
+		Weather:        weatherService,
 		Auth:           authService,
 		BirdCategories: birdCategoryService,
 	}); err != nil {

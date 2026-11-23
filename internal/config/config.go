@@ -17,12 +17,15 @@ const (
 	envDBMaxConnLife   = "DB_MAX_CONN_LIFETIME"
 	envDBMaxConnIdle   = "DB_MAX_CONN_IDLE_TIME"
 	envDBHealthCheck   = "DB_HEALTH_CHECK_PERIOD"
+	envWeatherAPIKey   = "WEATHER_API_KEY"
+	envWeatherAPIBase  = "WEATHER_API_BASE_URL"
 	defaultPort        = "8080"
 	defaultMaxConns    = 10
 	defaultMinConns    = 2
 	defaultMaxConnLife = 1 * time.Hour
 	defaultMaxConnIdle = 30 * time.Minute
 	defaultHealthCheck = 1 * time.Minute
+	defaultWeatherBase = "https://api.weatherapi.com/v1"
 	tokenTTL           = 24 * time.Hour
 )
 
@@ -37,14 +40,16 @@ type PoolConfig struct {
 
 // Config adalah konfigurasi runtime yang sudah divalidasi.
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
-	TokenTTL    time.Duration
-	Pool        PoolConfig
-	DocsEnabled bool
-	DocsUser    string
-	DocsPass    string
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	TokenTTL       time.Duration
+	Pool           PoolConfig
+	DocsEnabled    bool
+	DocsUser       string
+	DocsPass       string
+	WeatherAPIKey  string
+	WeatherAPIBase string
 }
 
 // Load membaca environment dan gagal lebih awal bila konfigurasi wajib kosong.
@@ -82,6 +87,12 @@ func Load() (Config, error) {
 		docsPass = "changeme"
 	}
 
+	weatherKey := os.Getenv(envWeatherAPIKey)
+	weatherBase := os.Getenv(envWeatherAPIBase)
+	if weatherBase == "" {
+		weatherBase = defaultWeatherBase
+	}
+
 	return Config{
 		Port:        port,
 		DatabaseURL: databaseURL,
@@ -94,9 +105,11 @@ func Load() (Config, error) {
 			MaxConnIdleTime:   maxConnIdle,
 			HealthCheckPeriod: healthCheck,
 		},
-		DocsEnabled: docsEnabled == "true" || docsEnabled == "1",
-		DocsUser:    docsUser,
-		DocsPass:    docsPass,
+		DocsEnabled:    docsEnabled == "true" || docsEnabled == "1",
+		DocsUser:       docsUser,
+		DocsPass:       docsPass,
+		WeatherAPIKey:  weatherKey,
+		WeatherAPIBase: weatherBase,
 	}, nil
 }
 

@@ -37,6 +37,8 @@ services:
       DOCS_ENABLED: ${DOCS_ENABLED:-true}
       DOCS_USER: ${DOCS_USER:-admin}
       DOCS_PASS: ${DOCS_PASS:-changeme}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      WEATHER_API_BASE_URL: ${WEATHER_API_BASE_URL:-https://api.weatherapi.com/v1}
     ports:
       - "8080:8080"
     depends_on:
