@@ -51,7 +51,7 @@ func main() {
 	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
 	organizerService := organizer.NewService(organizer.NewRepository(pool))
 	homeService := home.NewService(profileService, eventService, birdCategoryService, organizerService)
-	weatherService := weather.NewService(weather.NewClient(cfg.WeatherAPIKey, cfg.WeatherAPIBase))
+	weatherService := weather.NewService(weather.NewClient(cfg.WeatherAPIKey, cfg.WeatherAPIBase, cfg.WeatherAPILang))
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 
