@@ -39,8 +39,10 @@ func (f *fakeService) Get(ctx context.Context, identifier string, opts Options) 
 	return f.view, f.err
 }
 
-func (f *fakeService) GetFeatured(ctx context.Context) (Featured, error) { return f.featured, f.err }
-func (f *fakeService) GetUpcoming() Upcoming                             { return f.upcoming }
+func (f *fakeService) GetFeatured(ctx context.Context, identifier string) (Featured, error) {
+	return f.featured, f.err
+}
+func (f *fakeService) GetUpcoming(ctx context.Context) (Upcoming, error) { return f.upcoming, f.err }
 func (f *fakeService) GetStats() Stats                                   { return f.stats }
 func (f *fakeService) GetActiveTicket() ActiveTicket                     { return f.activeTicket }
 func (f *fakeService) GetSchedules() []Schedule                          { return f.schedules }
@@ -325,6 +327,12 @@ func TestGetHomeUpcomingHandler(t *testing.T) {
 		api, _ := setupHandler(t, &fakeService{})
 		if resp := api.Get("/api/v1/home/upcoming"); resp.Code != http.StatusUnauthorized {
 			t.Errorf("status = %d, ingin 401", resp.Code)
+		}
+	})
+	t.Run("error service", func(t *testing.T) {
+		api, tokens := setupHandler(t, &fakeService{err: errors.New("db down")})
+		if resp := api.Get("/api/v1/home/upcoming", testutil.BearerHeader(t, tokens)); resp.Code != http.StatusInternalServerError {
+			t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
 		}
 	})
 }

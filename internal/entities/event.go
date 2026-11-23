@@ -110,3 +110,25 @@ type EventDetail struct {
 	Event     Event
 	SubEvents []SubEvent
 }
+
+// UpcomingEvent adalah ringkasan event upcoming untuk halaman home.
+type UpcomingEvent struct {
+	ID               int64
+	Title            string
+	StartDate        *time.Time
+	RegistrationOpen *time.Time
+	MinPrice         int64
+	RemainingTickets int
+}
+
+// FeaturedEvent adalah ringkasan event featured untuk halaman home.
+type FeaturedEvent struct {
+	ID         int64
+	Title      string
+	StartDate  *time.Time
+	Venue      string
+	City       string
+	PrizePool  *string
+	TotalSlots int
+	DistanceKM *float64
+}

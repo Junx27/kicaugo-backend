@@ -29,7 +29,8 @@ type Repository interface {
 	UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
 	StopStreaming(ctx context.Context, eventID int64) (entities.EventStreaming, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
-	GetRandomFeatured(ctx context.Context) (*entities.Event, error)
+	GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error)
+	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
 }
 
 // db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
@@ -373,18 +374,47 @@ func (r *repository) GetActiveStreaming(ctx context.Context) (*entities.ActiveEv
 }
 
 // GetRandomFeatured mengambil satu event acak yang eligible untuk featured.
-func (r *repository) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
-	const query = `SELECT e.id, e.organizer_id, e.title, e.slug, e.venue, e.city, COALESCE(e.province, '') AS province,
-		e.city_id, e.province_id, e.latitude, e.longitude, e.start_date, e.end_date, e.status, e.banner_url
+// Jika origin user tersedia, jarak dihitung dari origin; jika tidak, distance_km NULL.
+func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error) {
+	origin, originErr := r.Origin(ctx, identifier)
+	var lat, lng *float64
+	var hasOrigin bool
+	if originErr == nil {
+		if origin.CurrentLatitude != nil && origin.CurrentLongitude != nil {
+			lat, lng, hasOrigin = origin.CurrentLatitude, origin.CurrentLongitude, true
+		} else if origin.CityLatitude != nil && origin.CityLongitude != nil {
+			lat, lng, hasOrigin = origin.CityLatitude, origin.CityLongitude, true
+		}
+	}
+	if originErr != nil && !errors.Is(originErr, apperrors.ErrNotFound) {
+		return nil, fmt.Errorf("get featured origin: %w", originErr)
+	}
+
+	const query = `WITH candidates AS (
+		SELECT e.id, e.title, e.start_date, e.venue, e.city, e.prize_pool, e.total_slots,
+			COALESCE(e.latitude, c.latitude) AS event_lat,
+			COALESCE(e.longitude, c.longitude) AS event_lng
 		FROM events e
+		LEFT JOIN cities c ON c.id = e.city_id
 		WHERE e.status IN ('published', 'ongoing')
 		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
-		ORDER BY RANDOM()
-		LIMIT 1`
-	var e entities.Event
-	err := r.db.QueryRow(ctx, query).Scan(
-		&e.ID, &e.OrganizerID, &e.Title, &e.Slug, &e.Venue, &e.City, &e.Province,
-		&e.CityID, &e.ProvinceID, &e.Latitude, &e.Longitude, &e.StartDate, &e.EndDate, &e.Status, &e.BannerURL,
+	)
+	SELECT id, title, start_date, venue, city, prize_pool, total_slots,
+		CASE WHEN $3::boolean THEN 6371.0088 * 2 * asin(LEAST(1, GREATEST(-1, sqrt(
+			power(sin(radians(event_lat - $1::double precision) / 2), 2) +
+			cos(radians($1::double precision)) * cos(radians(event_lat)) *
+			power(sin(radians(event_lng - $2::double precision) / 2), 2)
+		)))) ELSE NULL END AS distance_km
+	FROM candidates
+	ORDER BY RANDOM()
+	LIMIT 1`
+	var latVal, lngVal float64
+	if hasOrigin {
+		latVal, lngVal = *lat, *lng
+	}
+	var out entities.FeaturedEvent
+	err := r.db.QueryRow(ctx, query, latVal, lngVal, hasOrigin).Scan(
+		&out.ID, &out.Title, &out.StartDate, &out.Venue, &out.City, &out.PrizePool, &out.TotalSlots, &out.DistanceKM,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -392,5 +422,34 @@ func (r *repository) GetRandomFeatured(ctx context.Context) (*entities.Event, er
 	if err != nil {
 		return nil, fmt.Errorf("get random featured event: %w", err)
 	}
-	return &e, nil
+	return &out, nil
+}
+
+// GetRandomUpcoming mengambil satu event acak yang belum release (draft).
+func (r *repository) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
+	const query = `SELECT e.id, e.title, e.start_date, e.registration_open,
+		COALESCE((SELECT MIN(se.price) FROM sub_events se WHERE se.event_id = e.id), 0) AS min_price,
+		GREATEST(
+			e.total_slots - (
+				SELECT COUNT(*) FROM event_tickets et
+				WHERE et.event_id = e.id AND et.status = 'active'
+			),
+			0
+		) AS remaining_tickets
+		FROM events e
+		WHERE e.status = 'draft'
+		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
+		ORDER BY RANDOM()
+		LIMIT 1`
+	var out entities.UpcomingEvent
+	err := r.db.QueryRow(ctx, query).Scan(
+		&out.ID, &out.Title, &out.StartDate, &out.RegistrationOpen, &out.MinPrice, &out.RemainingTickets,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get random upcoming event: %w", err)
+	}
+	return &out, nil
 }

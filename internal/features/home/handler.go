@@ -156,7 +156,11 @@ func newGetFeaturedHandler(service Service) func(context.Context, *struct{}) (*r
 		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
 			return nil, err
 		}
-		featured, err := service.GetFeatured(ctx)
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		featured, err := service.GetFeatured(ctx, identifier)
 		if err != nil {
 			return nil, mapServiceError(err)
 		}
@@ -172,9 +176,13 @@ func newGetUpcomingHandler(service Service) func(context.Context, *struct{}) (*r
 		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
 			return nil, err
 		}
+		upcoming, err := service.GetUpcoming(ctx)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
 		resp := &response.HomeUpcomingOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Home upcoming loaded", toUpcomingData(service.GetUpcoming()))
+		resp.Body = response.NewSuccess(http.StatusOK, "Home upcoming loaded", toUpcomingData(upcoming))
 		return resp, nil
 	}
 }

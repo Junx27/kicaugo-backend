@@ -29,8 +29,10 @@ type fakeEventReader struct {
 	countErr        error
 	activeStreaming *entities.ActiveEventStreaming
 	activeErr       error
-	featured        *entities.Event
+	featured        *entities.FeaturedEvent
 	featuredErr     error
+	upcoming        *entities.UpcomingEvent
+	upcomingErr     error
 	identifier      string
 	opts            Options
 }
@@ -49,8 +51,12 @@ func (f *fakeEventReader) GetActiveStreaming(ctx context.Context) (*entities.Act
 	return f.activeStreaming, f.activeErr
 }
 
-func (f *fakeEventReader) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+func (f *fakeEventReader) GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error) {
 	return f.featured, f.featuredErr
+}
+
+func (f *fakeEventReader) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
+	return f.upcoming, f.upcomingErr
 }
 
 type fakeBirdCategoryReader struct {
@@ -128,16 +134,17 @@ func TestServiceGet(t *testing.T) {
 
 func TestServiceDummySections(t *testing.T) {
 	start := time.Date(2026, 12, 6, 0, 0, 0, 0, time.UTC)
-	svc := NewService(&fakeProfileReader{}, &fakeEventReader{featured: &entities.Event{Title: "Piala Raja Nusantara 2026", Venue: "Batavia Arena", City: "Jaksel", StartDate: &start}}, &fakeBirdCategoryReader{})
+	prizePool := "2000000"
+	svc := NewService(&fakeProfileReader{}, &fakeEventReader{featured: &entities.FeaturedEvent{Title: "Piala Raja Nusantara 2026", StartDate: &start, Venue: "Batavia Arena", City: "Jaksel", PrizePool: &prizePool, TotalSlots: 24}}, &fakeBirdCategoryReader{})
 
-	featured, err := svc.GetFeatured(context.Background())
-	if err != nil || featured.Title != "Piala Raja Nusantara 2026" || featured.Distance != "-" || featured.Prize != "-" || len(featured.Attendees.Initials) != 0 {
+	featured, err := svc.GetFeatured(context.Background(), "user@example.com")
+	if err != nil || featured.Title != "Piala Raja Nusantara 2026" || featured.Distance != "-" || featured.Prize != "Rp 2.000.000" || featured.Slots != "24 Slot" {
 		t.Fatalf("featured=%+v err=%v", featured, err)
 	}
 
-	upcoming := svc.GetUpcoming()
-	if upcoming.Title == "" || upcoming.RemainingTickets != 3 {
-		t.Errorf("upcoming = %+v", upcoming)
+	upcoming, err := svc.GetUpcoming(context.Background())
+	if err != nil || upcoming.Title != "Belum ada event upcoming" {
+		t.Errorf("upcoming = %+v err=%v", upcoming, err)
 	}
 
 	stats := svc.GetStats()
@@ -162,14 +169,56 @@ func TestServiceDummySections(t *testing.T) {
 func TestServiceGetFeatured(t *testing.T) {
 	t.Run("kosong", func(t *testing.T) {
 		svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{})
-		got, err := svc.GetFeatured(context.Background())
+		got, err := svc.GetFeatured(context.Background(), "user@example.com")
 		if err != nil || got.Title != "Belum ada event featured" {
 			t.Fatalf("got=%+v err=%v", got, err)
 		}
 	})
 	t.Run("error", func(t *testing.T) {
 		svc := NewService(&fakeProfileReader{}, &fakeEventReader{featuredErr: errors.New("db down")}, &fakeBirdCategoryReader{})
-		if _, err := svc.GetFeatured(context.Background()); err == nil {
+		if _, err := svc.GetFeatured(context.Background(), "user@example.com"); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+	t.Run("berhasil", func(t *testing.T) {
+		prizePool := "2000000"
+		start := time.Date(2026, 12, 6, 0, 0, 0, 0, time.UTC)
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{featured: &entities.FeaturedEvent{Title: "Piala Raja Nusantara 2026", StartDate: &start, Venue: "Batavia Arena", City: "Jaksel", PrizePool: &prizePool, TotalSlots: 24}}, &fakeBirdCategoryReader{})
+		got, err := svc.GetFeatured(context.Background(), "user@example.com")
+		if err != nil || got.Title != "Piala Raja Nusantara 2026" || got.Prize != "Rp 2.000.000" || got.Slots != "24 Slot" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
+}
+
+func TestServiceGetUpcoming(t *testing.T) {
+	t.Run("berhasil", func(t *testing.T) {
+		start := time.Date(2026, 12, 10, 0, 0, 0, 0, time.UTC)
+		reg := time.Date(2026, 12, 1, 8, 30, 0, 0, time.UTC)
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{upcoming: &entities.UpcomingEvent{Title: "Lomba Draft", StartDate: &start, RegistrationOpen: &reg, MinPrice: 50000, RemainingTickets: 24}}, &fakeBirdCategoryReader{})
+		got, err := svc.GetUpcoming(context.Background())
+		if err != nil || got.Title != "Lomba Draft" || got.Type != "Upcoming Event" || got.Price != "Rp 50.000" || got.RemainingTickets != 24 || got.Time != "01 Dec 2026 08:30" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
+	t.Run("gratis tanpa registrasi", func(t *testing.T) {
+		start := time.Date(2026, 12, 10, 0, 0, 0, 0, time.UTC)
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{upcoming: &entities.UpcomingEvent{Title: "Lomba Draft", StartDate: &start, MinPrice: 0, RemainingTickets: 10}}, &fakeBirdCategoryReader{})
+		got, err := svc.GetUpcoming(context.Background())
+		if err != nil || got.Price != "Gratis" || got.Time != "10 Dec 2026" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
+	t.Run("kosong", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{}, &fakeBirdCategoryReader{})
+		got, err := svc.GetUpcoming(context.Background())
+		if err != nil || got.Title != "Belum ada event upcoming" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
+	t.Run("error", func(t *testing.T) {
+		svc := NewService(&fakeProfileReader{}, &fakeEventReader{upcomingErr: errors.New("db down")}, &fakeBirdCategoryReader{})
+		if _, err := svc.GetUpcoming(context.Background()); err == nil {
 			t.Fatal("ingin error")
 		}
 	})

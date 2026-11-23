@@ -82,7 +82,11 @@ func (f *fakeService) GetActiveStreaming(ctx context.Context) (*entities.ActiveE
 	return nil, nil
 }
 
-func (f *fakeService) GetRandomFeatured(ctx context.Context) (*entities.Event, error) {
+func (f *fakeService) GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error) {
+	return nil, nil
+}
+
+func (f *fakeService) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
 	return nil, nil
 }
 

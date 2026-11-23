@@ -10,6 +10,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
+	"github.com/Junx27/kicaugo-backend/internal/utils/format"
 )
 
 // Options adalah parameter opsional permintaan home.
@@ -29,7 +30,8 @@ type EventReader interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error)
 	CountOngoing(ctx context.Context) (int, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
-	GetRandomFeatured(ctx context.Context) (*entities.Event, error)
+	GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error)
+	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
 }
 
 // BirdCategoryReader adalah bagian birdcategory.Service yang dipakai home.
@@ -106,8 +108,8 @@ type Schedule struct {
 // Service menyediakan data halaman home.
 type Service interface {
 	Get(ctx context.Context, identifier string, opts Options) (View, error)
-	GetFeatured(ctx context.Context) (Featured, error)
-	GetUpcoming() Upcoming
+	GetFeatured(ctx context.Context, identifier string) (Featured, error)
+	GetUpcoming(ctx context.Context) (Upcoming, error)
 	GetStats() Stats
 	GetActiveTicket() ActiveTicket
 	GetSchedules() []Schedule
@@ -159,19 +161,26 @@ func (s *service) Get(ctx context.Context, identifier string, opts Options) (Vie
 	}, nil
 }
 
-func (s *service) GetFeatured(ctx context.Context) (Featured, error) {
-	ev, err := s.events.GetRandomFeatured(ctx)
+func (s *service) GetFeatured(ctx context.Context, identifier string) (Featured, error) {
+	ev, err := s.events.GetRandomFeatured(ctx, identifier)
 	if err != nil {
 		return Featured{}, err
 	}
 	if ev == nil {
 		return emptyFeatured(), nil
 	}
-	return featuredFromEvent(*ev), nil
+	return featuredFromFeaturedEvent(*ev), nil
 }
 
-func (s *service) GetUpcoming() Upcoming {
-	return demoUpcoming()
+func (s *service) GetUpcoming(ctx context.Context) (Upcoming, error) {
+	ev, err := s.events.GetRandomUpcoming(ctx)
+	if err != nil {
+		return Upcoming{}, err
+	}
+	if ev == nil {
+		return emptyUpcoming(), nil
+	}
+	return upcomingFromEvent(*ev), nil
 }
 
 func (s *service) GetStats() Stats {
@@ -201,7 +210,8 @@ func emptyFeatured() Featured {
 	}
 }
 
-func featuredFromEvent(ev entities.Event) Featured {
+// featuredFromFeaturedEvent memetakan FeaturedEvent ke data ringkas home.
+func featuredFromFeaturedEvent(ev entities.FeaturedEvent) Featured {
 	schedule := "-"
 	if ev.StartDate != nil {
 		schedule = ev.StartDate.Format("02 Jan 2006")
@@ -212,12 +222,29 @@ func featuredFromEvent(ev entities.Event) Featured {
 	} else if location != "" {
 		schedule = location
 	}
+	prize := "-"
+	if ev.PrizePool != nil && *ev.PrizePool != "" {
+		prize = format.RupiahString(*ev.PrizePool)
+	}
+	slots := "-"
+	if ev.TotalSlots > 0 {
+		slots = fmt.Sprintf("%d Slot", ev.TotalSlots)
+	}
+	distance := "-"
+	if ev.DistanceKM != nil {
+		d := *ev.DistanceKM
+		if d < 0.1 {
+			distance = "< 0.1 km"
+		} else {
+			distance = fmt.Sprintf("%.1f km", d)
+		}
+	}
 	return Featured{
 		Title:     ev.Title,
 		Schedule:  schedule,
-		Distance:  "-",
-		Prize:     "-",
-		Slots:     "-",
+		Distance:  distance,
+		Prize:     prize,
+		Slots:     slots,
 		Attendees: FeaturedAttendees{Initials: []string{}, Others: 0},
 	}
 }
@@ -236,14 +263,22 @@ func stringsTrimJoin(parts []string) string {
 	return strings.Join(out, ", ")
 }
 
-func demoUpcoming() Upcoming {
-	return Upcoming{
-		Type:             "Latber Presisi",
-		Title:            "Latber Presisi Kacer",
-		Time:             "Besok, 14:00 WIB",
-		Price:            "Rp 75.000",
-		RemainingTickets: 3,
+func emptyUpcoming() Upcoming {
+	return Upcoming{Type: "Upcoming Event", Title: "Belum ada event upcoming", Time: "-", Price: "-", RemainingTickets: 0}
+}
+
+func upcomingFromEvent(ev entities.UpcomingEvent) Upcoming {
+	timeText := "-"
+	if ev.RegistrationOpen != nil {
+		timeText = ev.RegistrationOpen.Format("02 Jan 2006 15:04")
+	} else if ev.StartDate != nil {
+		timeText = ev.StartDate.Format("02 Jan 2006")
 	}
+	price := "Gratis"
+	if ev.MinPrice > 0 {
+		price = format.Rupiah(ev.MinPrice)
+	}
+	return Upcoming{Type: "Upcoming Event", Title: ev.Title, Time: timeText, Price: price, RemainingTickets: ev.RemainingTickets}
 }
 
 func demoStats() Stats {
