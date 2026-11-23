@@ -19,6 +19,7 @@ const (
 	envDBHealthCheck   = "DB_HEALTH_CHECK_PERIOD"
 	envWeatherAPIKey   = "WEATHER_API_KEY"
 	envWeatherAPIBase  = "WEATHER_API_BASE_URL"
+	envWeatherAPILang  = "WEATHER_API_LANG"
 	defaultPort        = "8080"
 	defaultMaxConns    = 10
 	defaultMinConns    = 2
@@ -26,6 +27,7 @@ const (
 	defaultMaxConnIdle = 30 * time.Minute
 	defaultHealthCheck = 1 * time.Minute
 	defaultWeatherBase = "https://api.weatherapi.com/v1"
+	defaultWeatherLang = "id"
 	tokenTTL           = 24 * time.Hour
 )
 
@@ -50,6 +52,7 @@ type Config struct {
 	DocsPass       string
 	WeatherAPIKey  string
 	WeatherAPIBase string
+	WeatherAPILang string
 }
 
 // Load membaca environment dan gagal lebih awal bila konfigurasi wajib kosong.
@@ -92,12 +95,16 @@ func Load() (Config, error) {
 	if weatherBase == "" {
 		weatherBase = defaultWeatherBase
 	}
+	weatherLang := os.Getenv(envWeatherAPILang)
+	if weatherLang == "" {
+		weatherLang = defaultWeatherLang
+	}
 
 	return Config{
-		Port:        port,
-		DatabaseURL: databaseURL,
-		JWTSecret:   secret,
-		TokenTTL:    tokenTTL,
+		Port:           port,
+		DatabaseURL:    databaseURL,
+		JWTSecret:      secret,
+		TokenTTL:       tokenTTL,
 		Pool: PoolConfig{
 			MaxConns:          int32(maxConns),
 			MinConns:          int32(minConns),
@@ -110,6 +117,7 @@ func Load() (Config, error) {
 		DocsPass:       docsPass,
 		WeatherAPIKey:  weatherKey,
 		WeatherAPIBase: weatherBase,
+		WeatherAPILang: weatherLang,
 	}, nil
 }
 

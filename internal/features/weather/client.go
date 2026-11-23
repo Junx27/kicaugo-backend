@@ -57,15 +57,19 @@ type apiResponse struct {
 type Client struct {
 	apiKey string
 	base   string
+	lang   string
 	http   *http.Client
 }
 
 // NewClient membuat client dengan timeout 5 detik.
-func NewClient(apiKey, base string) *Client {
+func NewClient(apiKey, base, lang string) *Client {
 	if base == "" {
 		base = "https://api.weatherapi.com/v1"
 	}
-	return &Client{apiKey: apiKey, base: base, http: &http.Client{Timeout: 5 * time.Second}}
+	if lang == "" {
+		lang = "id"
+	}
+	return &Client{apiKey: apiKey, base: base, lang: lang, http: &http.Client{Timeout: 5 * time.Second}}
 }
 
 // Fetch mengambil prakiraan cuaca untuk koordinat dan jumlah hari.
@@ -89,6 +93,9 @@ func (c *Client) Fetch(ctx context.Context, lat, lon float64, days int) (entitie
 	q.Set("days", strconv.Itoa(days))
 	q.Set("aqi", "no")
 	q.Set("alerts", "no")
+	if c.lang != "" {
+		q.Set("lang", c.lang)
+	}
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -118,7 +125,7 @@ func mapWeather(api apiResponse, lat, lon float64) entities.Weather {
 			Date:       d.Date,
 			MaxTempC:   d.Day.MaxTempC,
 			MinTempC:   d.Day.MinTempC,
-			Condition:  d.Day.Condition.Text,
+			Condition:  translateCondition(d.Day.Condition.Text),
 			Icon:       normalizeIcon(d.Day.Condition.Icon),
 			ChanceRain: d.Day.ChanceOfRain,
 		})
@@ -130,7 +137,7 @@ func mapWeather(api apiResponse, lat, lon float64) entities.Weather {
 		Current: entities.WeatherCurrent{
 			TempC:       api.Current.TempC,
 			FeelsLikeC:  api.Current.FeelsLikeC,
-			Condition:   api.Current.Condition.Text,
+			Condition:   translateCondition(api.Current.Condition.Text),
 			Icon:        normalizeIcon(api.Current.Condition.Icon),
 			Humidity:    api.Current.Humidity,
 			WindKph:     api.Current.WindKph,

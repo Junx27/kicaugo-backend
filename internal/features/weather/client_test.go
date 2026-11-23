@@ -33,13 +33,19 @@ func TestClientFetch(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		got, err := c.Fetch(context.Background(), -7.7, 110.3, 1)
 		if err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 		if got.Location != "Yogyakarta" || got.Current.TempC != 28.5 {
 			t.Errorf("got = %+v", got)
+		}
+		if got.Current.Condition != "Sebagian berawan" {
+			t.Errorf("condition = %q", got.Current.Condition)
+		}
+		if got.Forecast[0].Condition != "Cerah" {
+			t.Errorf("forecast condition = %q", got.Forecast[0].Condition)
 		}
 		if got.Current.Icon != "https://cdn.weatherapi.com/icon.png" {
 			t.Errorf("icon = %q", got.Current.Icon)
@@ -50,7 +56,7 @@ func TestClientFetch(t *testing.T) {
 	})
 
 	t.Run("tidak terkonfigurasi", func(t *testing.T) {
-		c := NewClient("", "https://example.com")
+		c := NewClient("", "https://example.com", "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 1); err != ErrNotConfigured {
 			t.Errorf("err = %v, ingin ErrNotConfigured", err)
 		}
@@ -61,7 +67,7 @@ func TestClientFetch(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		}))
 		defer srv.Close()
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 1); err == nil {
 			t.Error("Fetch() ingin error")
 		}
@@ -73,21 +79,21 @@ func TestClientFetch(t *testing.T) {
 			_, _ = w.Write([]byte("{invalid"))
 		}))
 		defer srv.Close()
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 1); err == nil {
 			t.Error("Fetch() ingin error")
 		}
 	})
 
 	t.Run("base kosong memakai default", func(t *testing.T) {
-		c := NewClient("key", "")
+		c := NewClient("key", "", "id")
 		if c.base != "https://api.weatherapi.com/v1" {
 			t.Errorf("base = %q", c.base)
 		}
 	})
 
 	t.Run("base tidak valid", func(t *testing.T) {
-		c := NewClient("key", "http://[::1")
+		c := NewClient("key", "http://[::1", "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 1); err == nil {
 			t.Error("Fetch() ingin error")
 		}
@@ -101,12 +107,12 @@ func TestClientFetch(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"location": map[string]any{"name": "X", "lat": 0.0, "lon": 0.0},
-				"current":  map[string]any{"temp_c": 1.0, "condition": map[string]any{"text": "Clear", "icon": "i.png"}},
+				"current":  map[string]any{"temp_c": 1.0, "condition": map[string]any{"text": "Sunny", "icon": "i.png"}},
 				"forecast": map[string]any{"forecastday": []any{}},
 			})
 		}))
 		defer srv.Close()
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 0); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
@@ -120,17 +126,23 @@ func TestClientFetch(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"location": map[string]any{"name": "X", "lat": 0.0, "lon": 0.0},
-				"current":  map[string]any{"temp_c": 1.0, "condition": map[string]any{"text": "Clear", "icon": "i.png"}},
+				"current":  map[string]any{"temp_c": 1.0, "condition": map[string]any{"text": "Sunny", "icon": "i.png"}},
 				"forecast": map[string]any{"forecastday": []any{}},
 			})
 		}))
 		defer srv.Close()
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		if _, err := c.Fetch(context.Background(), 0, 0, 99); err != nil {
 			t.Fatalf("Fetch() error = %v", err)
 		}
 	})
 
+	t.Run("lang kosong memakai default", func(t *testing.T) {
+		c := NewClient("key", "https://example.com", "")
+		if c.lang != "id" {
+			t.Errorf("lang = %q", c.lang)
+		}
+	})
 	t.Run("context dibatalkan", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(100 * time.Millisecond)
@@ -139,7 +151,7 @@ func TestClientFetch(t *testing.T) {
 		defer srv.Close()
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		c := NewClient("key", srv.URL)
+		c := NewClient("key", srv.URL, "id")
 		if _, err := c.Fetch(ctx, 0, 0, 1); err == nil {
 			t.Error("Fetch() ingin error")
 		}
