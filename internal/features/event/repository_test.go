@@ -265,6 +265,17 @@ func TestRepositoryGetRandomFeatured(t *testing.T) {
 	suffix := testSuffix(t)
 	lat, lng := -7.7, 110.3
 	address := "Jl. Test Featured"
+	identifier := "featured-" + suffix + "@example.com"
+	var userID int64
+	if err := conn.QueryRow(ctx, `INSERT INTO users (identifier, name, password_hash) VALUES ($1, 'Tester Featured', 'x') RETURNING id`, identifier).Scan(&userID); err != nil {
+		t.Fatalf("user: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO user_profiles (user_id, full_name, current_latitude, current_longitude, current_location_updated_at)
+		VALUES ($1, 'Tester Featured', $2, $3, now())
+		ON CONFLICT (user_id) DO UPDATE SET current_latitude = EXCLUDED.current_latitude, current_longitude = EXCLUDED.current_longitude, current_location_updated_at = EXCLUDED.current_location_updated_at`, userID, lat, lng); err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+
 	var cityID int64
 	if err := conn.QueryRow(ctx, `SELECT id FROM cities ORDER BY id LIMIT 1`).Scan(&cityID); err != nil {
 		t.Fatalf("city: %v", err)
@@ -276,7 +287,7 @@ func TestRepositoryGetRandomFeatured(t *testing.T) {
 		t.Fatalf("seed featured event: %v", err)
 	}
 
-	got, err := repo.GetRandomFeatured(ctx, "nobody@example.com")
+	got, err := repo.GetRandomFeatured(ctx, identifier)
 	if err != nil {
 		t.Fatalf("GetRandomFeatured() error = %v", err)
 	}
@@ -291,6 +302,9 @@ func TestRepositoryGetRandomFeatured(t *testing.T) {
 	}
 	if got.Longitude == nil || *got.Longitude != lng {
 		t.Errorf("Longitude = %v, ingin %v", got.Longitude, lng)
+	}
+	if got.DistanceKM == nil || *got.DistanceKM > 50 {
+		t.Errorf("DistanceKM = %v, ingin <= 50", got.DistanceKM)
 	}
 }
 func TestRepositoryErrorPaths(t *testing.T) {

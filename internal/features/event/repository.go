@@ -389,6 +389,10 @@ func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (
 	if originErr != nil && !errors.Is(originErr, apperrors.ErrNotFound) {
 		return nil, fmt.Errorf("get featured origin: %w", originErr)
 	}
+	// Tanpa origin (lokasi user/kota), jarak tidak dapat dihitung → tidak tampilkan featured.
+	if !hasOrigin {
+		return nil, nil
+	}
 
 	const query = `WITH candidates AS (
 		SELECT e.id, e.title, e.start_date, e.venue, e.city, e.address, e.prize_pool, e.total_slots,
@@ -398,22 +402,25 @@ func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (
 		LEFT JOIN cities c ON c.id = e.city_id
 		WHERE e.status IN ('published', 'ongoing')
 		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
+	), distances AS (
+		SELECT id, title, start_date, venue, city, address, prize_pool, total_slots, event_lat, event_lng,
+			6371.0088 * 2 * asin(LEAST(1, GREATEST(-1, sqrt(
+				power(sin(radians(event_lat - $1::double precision) / 2), 2) +
+				cos(radians($1::double precision)) * cos(radians(event_lat)) *
+				power(sin(radians(event_lng - $2::double precision) / 2), 2)
+			)))) AS distance_km
+		FROM candidates
+		WHERE event_lat IS NOT NULL AND event_lng IS NOT NULL
 	)
-	SELECT id, title, start_date, venue, city, address, prize_pool, total_slots, event_lat, event_lng,
-		CASE WHEN $3::boolean THEN 6371.0088 * 2 * asin(LEAST(1, GREATEST(-1, sqrt(
-			power(sin(radians(event_lat - $1::double precision) / 2), 2) +
-			cos(radians($1::double precision)) * cos(radians(event_lat)) *
-			power(sin(radians(event_lng - $2::double precision) / 2), 2)
-		)))) ELSE NULL END AS distance_km
-	FROM candidates
+	SELECT id, title, start_date, venue, city, address, prize_pool, total_slots, event_lat, event_lng, distance_km
+	FROM distances
+	WHERE distance_km <= 50
 	ORDER BY RANDOM()
 	LIMIT 1`
 	var latVal, lngVal float64
-	if hasOrigin {
-		latVal, lngVal = *lat, *lng
-	}
+	latVal, lngVal = *lat, *lng
 	var out entities.FeaturedEvent
-	err := r.db.QueryRow(ctx, query, latVal, lngVal, hasOrigin).Scan(
+	err := r.db.QueryRow(ctx, query, latVal, lngVal).Scan(
 		&out.ID, &out.Title, &out.StartDate, &out.Venue, &out.City, &out.Address, &out.PrizePool, &out.TotalSlots, &out.Latitude, &out.Longitude, &out.DistanceKM,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
