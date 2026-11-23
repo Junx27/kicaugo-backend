@@ -34,10 +34,11 @@ func firstName(fullName string) string {
 // toData memilih field ringkas untuk response home profile.
 func toData(view View) response.HomeProfileData {
 	data := response.HomeProfileData{
-		Name:      firstName(view.Profile.Profile.FullName),
-		Avatar:    view.Profile.Profile.AvatarURL,
-		Message:   view.Greeting,
-		LiveCount: view.OngoingEventsCount,
+		Name:        firstName(view.Profile.Profile.FullName),
+		Avatar:      view.Profile.Profile.AvatarURL,
+		Message:     view.Greeting,
+		LiveCount:   view.OngoingEventsCount,
+		IsOrganizer: view.IsOrganizer,
 	}
 	if view.ActiveStreaming != nil {
 		streaming := toActiveStreamingData(*view.ActiveStreaming)
@@ -153,9 +154,6 @@ func newGetProfileHandler(service Service) func(context.Context, *request.HomePr
 
 func newGetFeaturedHandler(service Service) func(context.Context, *struct{}) (*response.HomeFeaturedOutput, error) {
 	return func(ctx context.Context, _ *struct{}) (*response.HomeFeaturedOutput, error) {
-		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
-			return nil, err
-		}
 		identifier, err := authctx.IdentifierFromContext(ctx)
 		if err != nil {
 			return nil, err

@@ -23,6 +23,7 @@ type HomeProfileData struct {
 	Avatar          *string                  `json:"avatar"`
 	Message         string                   `json:"message"`
 	LiveCount       int                      `json:"live_count"`
+	IsOrganizer     bool                     `json:"is_organizer"`
 	ActiveStreaming *HomeActiveStreamingData `json:"active_streaming"`
 }
 

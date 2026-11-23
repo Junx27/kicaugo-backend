@@ -39,6 +39,11 @@ type BirdCategoryReader interface {
 	List(ctx context.Context) ([]entities.BirdCategory, error)
 }
 
+// OrganizerReader adalah bagian organizer.Service yang dipakai home.
+type OrganizerReader interface {
+	HasActiveMembership(ctx context.Context, identifier string) (bool, error)
+}
+
 // View menggabungkan profil, event terdekat, sapaan, dan jumlah event berlangsung.
 type View struct {
 	Profile            profile.ProfileView
@@ -46,6 +51,14 @@ type View struct {
 	Greeting           string
 	OngoingEventsCount int
 	ActiveStreaming    *entities.ActiveEventStreaming
+	IsOrganizer        bool
+}
+
+// eventSummary merangkum data event yang dibutuhkan halaman home.
+type eventSummary struct {
+	nearby          event.NearbyResult
+	ongoingCount    int
+	activeStreaming *entities.ActiveEventStreaming
 }
 
 // Featured adalah data demo featured contest Beranda.
@@ -121,44 +134,59 @@ type service struct {
 	profiles       ProfileReader
 	events         EventReader
 	birdCategories BirdCategoryReader
+	organizers     OrganizerReader
 	now            func() time.Time
 }
 
 // NewService membuat service dengan dependency home yang sudah ada.
-func NewService(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader) Service {
-	return NewServiceWithClock(profiles, events, birdCategories, time.Now)
+func NewService(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader, organizers OrganizerReader) Service {
+	return NewServiceWithClock(profiles, events, birdCategories, organizers, time.Now)
 }
 
 // NewServiceWithClock membuat service dengan jam yang dapat ditentukan, antara lain untuk test.
-func NewServiceWithClock(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader, now func() time.Time) Service {
-	return &service{profiles: profiles, events: events, birdCategories: birdCategories, now: now}
+func NewServiceWithClock(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader, organizers OrganizerReader, now func() time.Time) Service {
+	return &service{profiles: profiles, events: events, birdCategories: birdCategories, organizers: organizers, now: now}
 }
 
-// Get mengambil profil, event terdekat, dan jumlah event berlangsung untuk identifier tertentu.
+// Get mengambil profil, status organizer, event terdekat, dan jumlah event berlangsung untuk identifier tertentu.
 func (s *service) Get(ctx context.Context, identifier string, opts Options) (View, error) {
 	view, err := s.profiles.Get(ctx, identifier)
 	if err != nil {
 		return View{}, err
 	}
-	nearby, err := s.events.ListNearby(ctx, identifier, opts.RadiusKM, opts.CategoryID, opts.Limit)
+	isOrganizer, err := s.organizers.HasActiveMembership(ctx, identifier)
 	if err != nil {
 		return View{}, err
 	}
-	count, err := s.events.CountOngoing(ctx)
-	if err != nil {
-		return View{}, err
-	}
-	activeStreaming, err := s.events.GetActiveStreaming(ctx)
+	summary, err := s.loadEventSummary(ctx, identifier, opts)
 	if err != nil {
 		return View{}, err
 	}
 	return View{
 		Profile:            view,
-		Nearby:             nearby,
+		Nearby:             summary.nearby,
 		Greeting:           greeting(s.now()),
-		OngoingEventsCount: count,
-		ActiveStreaming:    activeStreaming,
+		OngoingEventsCount: summary.ongoingCount,
+		ActiveStreaming:    summary.activeStreaming,
+		IsOrganizer:        isOrganizer,
 	}, nil
+}
+
+// loadEventSummary mengambil event terdekat, jumlah event berlangsung, dan streaming aktif.
+func (s *service) loadEventSummary(ctx context.Context, identifier string, opts Options) (eventSummary, error) {
+	nearby, err := s.events.ListNearby(ctx, identifier, opts.RadiusKM, opts.CategoryID, opts.Limit)
+	if err != nil {
+		return eventSummary{}, err
+	}
+	count, err := s.events.CountOngoing(ctx)
+	if err != nil {
+		return eventSummary{}, err
+	}
+	activeStreaming, err := s.events.GetActiveStreaming(ctx)
+	if err != nil {
+		return eventSummary{}, err
+	}
+	return eventSummary{nearby: nearby, ongoingCount: count, activeStreaming: activeStreaming}, nil
 }
 
 func (s *service) GetFeatured(ctx context.Context, identifier string) (Featured, error) {

@@ -48,8 +48,8 @@ func main() {
 	profileService := profile.NewService(profile.NewRepository(pool))
 	eventService := event.NewService(event.NewRepository(pool))
 	birdCategoryService := birdcategory.NewService(birdcategory.NewRepository(pool))
-	homeService := home.NewService(profileService, eventService, birdCategoryService)
 	organizerService := organizer.NewService(organizer.NewRepository(pool))
+	homeService := home.NewService(profileService, eventService, birdCategoryService, organizerService)
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 
