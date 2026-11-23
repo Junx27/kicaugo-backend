@@ -391,7 +391,7 @@ func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (
 	}
 
 	const query = `WITH candidates AS (
-		SELECT e.id, e.title, e.start_date, e.venue, e.city, e.prize_pool, e.total_slots,
+		SELECT e.id, e.title, e.start_date, e.venue, e.city, e.address, e.prize_pool, e.total_slots,
 			COALESCE(e.latitude, c.latitude) AS event_lat,
 			COALESCE(e.longitude, c.longitude) AS event_lng
 		FROM events e
@@ -399,7 +399,7 @@ func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (
 		WHERE e.status IN ('published', 'ongoing')
 		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
 	)
-	SELECT id, title, start_date, venue, city, prize_pool, total_slots,
+	SELECT id, title, start_date, venue, city, address, prize_pool, total_slots, event_lat, event_lng,
 		CASE WHEN $3::boolean THEN 6371.0088 * 2 * asin(LEAST(1, GREATEST(-1, sqrt(
 			power(sin(radians(event_lat - $1::double precision) / 2), 2) +
 			cos(radians($1::double precision)) * cos(radians(event_lat)) *
@@ -414,7 +414,7 @@ func (r *repository) GetRandomFeatured(ctx context.Context, identifier string) (
 	}
 	var out entities.FeaturedEvent
 	err := r.db.QueryRow(ctx, query, latVal, lngVal, hasOrigin).Scan(
-		&out.ID, &out.Title, &out.StartDate, &out.Venue, &out.City, &out.PrizePool, &out.TotalSlots, &out.DistanceKM,
+		&out.ID, &out.Title, &out.StartDate, &out.Venue, &out.City, &out.Address, &out.PrizePool, &out.TotalSlots, &out.Latitude, &out.Longitude, &out.DistanceKM,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

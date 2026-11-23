@@ -68,6 +68,9 @@ type Featured struct {
 	Distance  string
 	Prize     string
 	Slots     string
+	Address   *string
+	Latitude  *float64
+	Longitude *float64
 	Attendees FeaturedAttendees
 }
 
@@ -96,10 +99,13 @@ type Stats struct {
 
 // ActiveTicket adalah data demo tiket aktif Beranda.
 type ActiveTicket struct {
-	Event    string
-	Schedule string
-	Number   string
-	Session  string
+	Event     string
+	Schedule  string
+	Number    string
+	Session   string
+	Address   *string
+	Latitude  *float64
+	Longitude *float64
 }
 
 // ScheduleCategory adalah kategori burung pada jadwal Beranda.
@@ -273,6 +279,9 @@ func featuredFromFeaturedEvent(ev entities.FeaturedEvent) Featured {
 		Distance:  distance,
 		Prize:     prize,
 		Slots:     slots,
+		Address:   ev.Address,
+		Latitude:  ev.Latitude,
+		Longitude: ev.Longitude,
 		Attendees: FeaturedAttendees{Initials: []string{}, Others: 0},
 	}
 }
@@ -319,11 +328,16 @@ func demoStats() Stats {
 }
 
 func demoActiveTicket() ActiveTicket {
+	address := "GOR Kota, Banda Aceh"
+	lat, lng := -6.2, 106.8
 	return ActiveTicket{
-		Event:    "Grand Prix Murai Batu VIP #18",
-		Schedule: "Sabtu, 12 Des • Masterpiece Arena",
-		Number:   "#G-18",
-		Session:  "Sesi A - 16G",
+		Event:     "Grand Prix Murai Batu VIP #18",
+		Schedule:  "Sabtu, 12 Des • Masterpiece Arena",
+		Number:    "#G-18",
+		Session:   "Sesi A - 16G",
+		Address:   &address,
+		Latitude:  &lat,
+		Longitude: &lng,
 	}
 }
 

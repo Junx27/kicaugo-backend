@@ -62,11 +62,14 @@ func toActiveStreamingData(s entities.ActiveEventStreaming) response.HomeActiveS
 
 func toFeaturedData(data Featured) response.HomeFeaturedData {
 	return response.HomeFeaturedData{
-		Title:    data.Title,
-		Schedule: data.Schedule,
-		Distance: data.Distance,
-		Prize:    data.Prize,
-		Slots:    data.Slots,
+		Title:     data.Title,
+		Schedule:  data.Schedule,
+		Distance:  data.Distance,
+		Prize:     data.Prize,
+		Slots:     data.Slots,
+		Address:   data.Address,
+		Latitude:  data.Latitude,
+		Longitude: data.Longitude,
 		Attendees: response.FeaturedAttendeesData{
 			Initials: data.Attendees.Initials,
 			Others:   data.Attendees.Others,
@@ -95,10 +98,13 @@ func toStatsData(data Stats) response.HomeStatsData {
 
 func toActiveTicketData(data ActiveTicket) response.HomeActiveTicketData {
 	return response.HomeActiveTicketData{
-		Event:    data.Event,
-		Schedule: data.Schedule,
-		Number:   data.Number,
-		Session:  data.Session,
+		Event:     data.Event,
+		Schedule:  data.Schedule,
+		Number:    data.Number,
+		Session:   data.Session,
+		Address:   data.Address,
+		Latitude:  data.Latitude,
+		Longitude: data.Longitude,
 	}
 }
 

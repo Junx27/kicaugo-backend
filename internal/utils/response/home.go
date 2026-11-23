@@ -46,6 +46,9 @@ type HomeFeaturedData struct {
 	Distance  string                `json:"distance"`
 	Prize     string                `json:"prize"`
 	Slots     string                `json:"slots"`
+	Address   *string               `json:"address"`
+	Latitude  *float64              `json:"latitude"`
+	Longitude *float64              `json:"longitude"`
 	Attendees FeaturedAttendeesData `json:"attendees"`
 }
 
@@ -86,10 +89,13 @@ type HomeStatsOutput struct {
 
 // HomeActiveTicketData adalah data demo tiket aktif Beranda.
 type HomeActiveTicketData struct {
-	Event    string `json:"event"`
-	Schedule string `json:"schedule"`
-	Number   string `json:"number"`
-	Session  string `json:"session"`
+	Event     string   `json:"event"`
+	Schedule  string   `json:"schedule"`
+	Number    string   `json:"number"`
+	Session   string   `json:"session"`
+	Address   *string  `json:"address"`
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
 }
 
 // HomeActiveTicketOutput adalah output GET /api/v1/home/active-ticket.

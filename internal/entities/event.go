@@ -128,6 +128,9 @@ type FeaturedEvent struct {
 	StartDate  *time.Time
 	Venue      string
 	City       string
+	Address    *string
+	Latitude   *float64
+	Longitude  *float64
 	PrizePool  *string
 	TotalSlots int
 	DistanceKM *float64
