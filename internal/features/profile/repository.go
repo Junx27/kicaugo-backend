@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	dbutil "github.com/Junx27/kicaugo-backend/internal/utils/db"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
@@ -26,18 +26,9 @@ type Repository interface {
 	ReplaceFavorites(ctx context.Context, userID int64, categoryIDs []int64) error
 }
 
-// db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
-// Memakai antarmuka ini membuat test repository bisa dijalankan dalam transaksi.
-type db interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Begin(ctx context.Context) (pgx.Tx, error)
-}
-
 // repository adalah implementasi Repository berbasis pgx.
 type repository struct {
-	db db
+	db dbutil.Querier
 }
 
 // NewRepository membuat repository dengan connection pool yang sudah ada.
@@ -47,15 +38,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 
 // ResolveUserID menerjemahkan identifier dari token menjadi ID user.
 func (r *repository) ResolveUserID(ctx context.Context, identifier string) (int64, error) {
-	var id int64
-	err := r.db.QueryRow(ctx, `SELECT id FROM users WHERE identifier = $1`, identifier).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, apperrors.ErrNotFound
-	}
-	if err != nil {
-		return 0, fmt.Errorf("resolve user: %w", err)
-	}
-	return id, nil
+	return dbutil.ResolveUserID(ctx, r.db, identifier)
 }
 
 // EnsureAndGet membuat profil bila belum ada, lalu mengembalikannya beserta kota dan provinsi.
@@ -112,18 +95,7 @@ func (r *repository) FavoriteCategories(ctx context.Context, userID int64) ([]en
 	}
 	defer rows.Close()
 
-	var out []entities.BirdCategory
-	for rows.Next() {
-		var c entities.BirdCategory
-		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.Icon, &c.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan favorite category: %w", err)
-		}
-		out = append(out, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate favorite categories: %w", err)
-	}
-	return out, nil
+	return dbutil.ScanBirdCategories(rows)
 }
 
 // City mencari kabupaten/kota berdasarkan ID.

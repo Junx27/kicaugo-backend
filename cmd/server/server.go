@@ -175,7 +175,7 @@ func configureHumaError() {
 // shutdownOnSignal menunggu sinyal berhenti, lalu menutup server dengan anggun.
 func shutdownOnSignal(ctx context.Context, httpServer *http.Server) {
 	<-ctx.Done()
-	shutdownCtx, stop := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutdownCtx, stop := context.WithTimeout(ctx, shutdownTimeout)
 	defer stop()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		slog.Error("failed to shutdown server", "error", err)

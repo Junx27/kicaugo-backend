@@ -8,7 +8,8 @@ on:
 
 env:
   GO_VERSION: "1.27"
-  DATABASE_URL: postgres://kicaugo:kicaugo@localhost:5432/kicaugo?sslmode=disable
+  DATABASE_URL: postgres://kicaugo@localhost:5432/kicaugo?sslmode=disable
+  TEST_DATABASE_URL: postgres://kicaugo@localhost:5432/kicaugo?sslmode=disable
   JWT_SECRET: ci-jwt-secret-min-32-chars-for-tests-only
   CARTO_BASEMAP_KEY: ""
   CARTO_BASEMAP_URL: https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
@@ -26,8 +27,8 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: kicaugo
-          POSTGRES_PASSWORD: kicaugo
           POSTGRES_DB: kicaugo
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -38,12 +39,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -63,6 +64,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Prepare test database
+        run: |
+          for file in internal/database/migrations/*.sql internal/database/indexes/*.sql internal/database/seeders/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
+
       - name: Test (race + coverage)
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
@@ -81,7 +88,7 @@ jobs:
           diff-cover coverage.lcov --compare-branch=origin/${{ github.base_ref }} --fail-under=100
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
           path: coverage.out
@@ -93,7 +100,7 @@ jobs:
     needs: test
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 

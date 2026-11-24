@@ -84,24 +84,13 @@ func TestGetBasemapTileHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("x di luar batas", func(t *testing.T) {
-		api, tokens := setupTileAPI(t, &fakeTileService{}, 1000)
-		if resp := api.Get(tileBasePath+"1/2/0", testutil.BearerHeader(t, tokens)); resp.Code != http.StatusBadRequest {
-			t.Errorf(want400Status, resp.Code)
-		}
-	})
-
-	t.Run("y di luar batas", func(t *testing.T) {
-		api, tokens := setupTileAPI(t, &fakeTileService{}, 1000)
-		if resp := api.Get(tileBasePath+"1/0/2", testutil.BearerHeader(t, tokens)); resp.Code != http.StatusBadRequest {
-			t.Errorf(want400Status, resp.Code)
-		}
-	})
-
-	t.Run("y tidak kurang dari 2^z", func(t *testing.T) {
-		api, tokens := setupTileAPI(t, &fakeTileService{}, 1000)
-		if resp := api.Get(tileBasePath+"2/0/4", testutil.BearerHeader(t, tokens)); resp.Code != http.StatusBadRequest {
-			t.Errorf(want400Status, resp.Code)
+	t.Run("koordinat di luar batas", func(t *testing.T) {
+		cases := []string{"1/2/0", "1/0/2", "2/0/4"}
+		for _, path := range cases {
+			api, tokens := setupTileAPI(t, &fakeTileService{}, 1000)
+			if resp := api.Get(tileBasePath+path, testutil.BearerHeader(t, tokens)); resp.Code != http.StatusBadRequest {
+				t.Errorf("%s: "+want400Status, path, resp.Code)
+			}
 		}
 	})
 
