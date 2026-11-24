@@ -449,14 +449,22 @@ func runGofmt(files []string) error {
 		return nil
 	}
 	args := append([]string{"-w"}, goFiles...)
-	cmd := exec.Command("gofmt", args...)
+	gofmtPath, err := exec.LookPath("gofmt")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(gofmtPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
 func runBuild() error {
-	cmd := exec.Command("go", "build", "./...")
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(goPath, "build", "./...")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
