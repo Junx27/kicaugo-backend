@@ -74,7 +74,7 @@ jobs:
       - name: Check changed-lines coverage (100%)
         if: github.event_name == 'pull_request'
         run: |
-          python3 -m pip install --quiet diff-cover
+          python3 -m pip install --quiet --only-binary :all: diff-cover==11.0.4
           git fetch origin ${{ github.base_ref }} --depth=1
           diff-cover coverage.lcov --compare-branch=origin/${{ github.base_ref }} --fail-under=100
 
