@@ -10,6 +10,11 @@ autentikasi; kontrak OpenAPI dihasilkan Huma di `/openapi.json`.
 | `DATABASE_URL` | ya | — | `postgres://user:pass@localhost:5432/kicaugo?sslmode=disable` |
 | `JWT_SECRET` | ya | — | Minimal 32 karakter acak, jangan di-commit |
 | `PORT` | tidak | `8080` | Port HTTP |
+| `CARTO_BASEMAP_KEY` | tidak | — | Wajib untuk fitur basemap; bila kosong endpoint tile membalas 503. Jangan di-commit. |
+| `CARTO_BASEMAP_URL` | tidak | template Voyager CARTO | Template tile dengan placeholder `{s}`, `{z}`, `{x}`, `{y}`, `{r}` |
+| `CARTO_TILE_CACHE_TTL` | tidak | `168h` | TTL cache tile di memori |
+| `CARTO_TILE_CACHE_MAX_ENTRIES` | tidak | `20000` | Jumlah maksimum tile yang di-cache |
+| `CARTO_TILE_RATE_PER_MIN` | tidak | `300` | Batas request tile per user per menit |
 
 ## Menjalankan
 
