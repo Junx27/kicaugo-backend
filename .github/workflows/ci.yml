@@ -67,6 +67,17 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Convert coverage to LCOV
+        if: github.event_name == 'pull_request'
+        run: go run github.com/jandelgado/gcov2lcov@latest -infile=coverage.out -outfile=coverage.lcov
+
+      - name: Check changed-lines coverage (100%)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 -m pip install --quiet diff-cover
+          git fetch origin ${{ github.base_ref }} --depth=1
+          diff-cover coverage.lcov --compare-branch=origin/${{ github.base_ref }} --fail-under=100
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
