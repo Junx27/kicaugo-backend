@@ -9,11 +9,12 @@ import (
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/testutil"
+	dbutil "github.com/Junx27/kicaugo-backend/internal/utils/db"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
 // newTestRepository menyiapkan repository di dalam transaksi yang selalu di-rollback.
-func newTestRepository(t *testing.T) (Repository, context.Context, db) {
+func newTestRepository(t *testing.T) (Repository, context.Context, dbutil.Querier) {
 	t.Helper()
 	pool := testutil.OpenDB(t)
 	ctx := context.Background()
@@ -25,7 +26,7 @@ func newTestRepository(t *testing.T) (Repository, context.Context, db) {
 	return &repository{db: tx}, ctx, tx
 }
 
-func newTestUser(t *testing.T, conn db, ctx context.Context) (int64, string) {
+func newTestUser(t *testing.T, conn dbutil.Querier, ctx context.Context) (int64, string) {
 	t.Helper()
 	identifier := fmt.Sprintf("profile-test-%d@example.com", time.Now().UnixNano())
 	var id int64

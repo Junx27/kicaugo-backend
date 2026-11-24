@@ -10,11 +10,12 @@ import (
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
 	"github.com/Junx27/kicaugo-backend/internal/testutil"
+	dbutil "github.com/Junx27/kicaugo-backend/internal/utils/db"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
 // newTestRepository menyiapkan repository di dalam transaksi yang selalu di-rollback.
-func newTestRepository(t *testing.T) (Repository, context.Context, db) {
+func newTestRepository(t *testing.T) (Repository, context.Context, dbutil.Querier) {
 	t.Helper()
 	pool := testutil.OpenDB(t)
 	ctx := context.Background()
@@ -31,7 +32,7 @@ func testSuffix(t *testing.T) string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
-func createOrganizer(t *testing.T, conn db, ctx context.Context) int64 {
+func createOrganizer(t *testing.T, conn dbutil.Querier, ctx context.Context) int64 {
 	t.Helper()
 	suffix := testSuffix(t)
 	var id int64
@@ -56,7 +57,7 @@ type eventFixture struct {
 	categoryID *int64
 }
 
-func seedEvent(t *testing.T, conn db, ctx context.Context, organizerID int64, f eventFixture) int64 {
+func seedEvent(t *testing.T, conn dbutil.Querier, ctx context.Context, organizerID int64, f eventFixture) int64 {
 	t.Helper()
 	var id int64
 	err := conn.QueryRow(ctx, `

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	dbutil "github.com/Junx27/kicaugo-backend/internal/utils/db"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
@@ -25,13 +26,8 @@ type Repository interface {
 	HasActiveMembership(ctx context.Context, identifier string) (bool, error)
 }
 
-type db interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
 type repository struct {
-	db db
+	db dbutil.Querier
 }
 
 // NewRepository membuat repository dengan connection pool yang sudah ada.

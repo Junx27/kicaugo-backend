@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	dbutil "github.com/Junx27/kicaugo-backend/internal/utils/db"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
@@ -33,17 +34,9 @@ type Repository interface {
 	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
 }
 
-// db adalah kontrak minimal yang dipenuhi pgxpool.Pool maupun pgx.Tx.
-type db interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Begin(ctx context.Context) (pgx.Tx, error)
-}
-
 // repository adalah implementasi Repository berbasis pgx.
 type repository struct {
-	db db
+	db dbutil.Querier
 }
 
 // NewRepository membuat repository dengan connection pool yang sudah ada.
