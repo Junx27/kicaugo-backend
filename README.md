@@ -7,7 +7,7 @@ autentikasi; kontrak OpenAPI dihasilkan Huma di `/openapi.json`.
 
 | Env | Wajib | Default | Keterangan |
 |---|---|---|---|
-| `DATABASE_URL` | ya | — | `postgres://user:pass@localhost:5432/kicaugo?sslmode=disable` |
+| `DATABASE_URL` | ya | — | `postgres://<user>:<password>@localhost:5432/<db>?sslmode=disable` |
 | `JWT_SECRET` | ya | — | Minimal 32 karakter acak, jangan di-commit |
 | `PORT` | tidak | `8080` | Port HTTP |
 | `CARTO_BASEMAP_KEY` | tidak | — | Wajib untuk fitur basemap; bila kosong endpoint tile membalas 503. Jangan di-commit. |
@@ -27,7 +27,7 @@ Migrasi, index, dan seeder dijalankan otomatis saat startup dari
 `internal/database/seeders`. Seeder bersifat idempotent sehingga aman dijalankan
 berulang kali.
 
-Akun demo: `test@gmail.com` / `test123@`.
+Akun demo dibuat oleh seeder (lihat `internal/database/seeders`); jangan gunakan kredensial default di produksi.
 
 ## Struktur
 
