@@ -5,10 +5,108 @@ import (
 	"time"
 )
 
+const (
+	testDatabaseURL = "postgres://localhost/kicaugo"
+	testJWTSecret   = "rahasia-panjang"
+	loadErrFormat   = "Load() error = %v"
+	cartoTTLFormat  = "CartoTileCacheTTL = %v"
+	cartoMaxFormat  = "CartoTileCacheMaxEntries = %d"
+	cartoRateFormat = "CartoTileRatePerMin = %d"
+)
+
+func setRequiredConfigEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(envDatabaseURL, testDatabaseURL)
+	t.Setenv(envJWTSecret, testJWTSecret)
+}
+
+func TestLoadBasemapConfig(t *testing.T) {
+	t.Run("kosong memakai default", func(t *testing.T) {
+		setRequiredConfigEnv(t)
+		t.Setenv(envCartoBasemapKey, "")
+		t.Setenv(envCartoBasemapURL, "")
+		t.Setenv(envCartoTileCacheTTL, "")
+		t.Setenv(envCartoTileCacheMaxEntries, "")
+		t.Setenv(envCartoTileRatePerMin, "")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf(loadErrFormat, err)
+		}
+		if cfg.CartoBasemapKey != "" {
+			t.Errorf("CartoBasemapKey = %q, ingin kosong", cfg.CartoBasemapKey)
+		}
+		if cfg.CartoBasemapURL != defaultCartoBasemapURL {
+			t.Errorf("CartoBasemapURL = %q", cfg.CartoBasemapURL)
+		}
+		if cfg.CartoTileCacheTTL != defaultCartoTileCacheTTL {
+			t.Errorf(cartoTTLFormat, cfg.CartoTileCacheTTL)
+		}
+		if cfg.CartoTileCacheMaxEntries != defaultCartoTileCacheMaxEntries {
+			t.Errorf(cartoMaxFormat, cfg.CartoTileCacheMaxEntries)
+		}
+		if cfg.CartoTileRatePerMin != defaultCartoTileRatePerMin {
+			t.Errorf(cartoRateFormat, cfg.CartoTileRatePerMin)
+		}
+	})
+
+	t.Run("terisi", func(t *testing.T) {
+		setRequiredConfigEnv(t)
+		t.Setenv(envCartoBasemapKey, "fake-key")
+		t.Setenv(envCartoBasemapURL, "https://tiles.example/{z}/{x}/{y}.png")
+		t.Setenv(envCartoTileCacheTTL, "2h")
+		t.Setenv(envCartoTileCacheMaxEntries, "10")
+		t.Setenv(envCartoTileRatePerMin, "5")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf(loadErrFormat, err)
+		}
+		if cfg.CartoBasemapKey != "fake-key" {
+			t.Errorf("CartoBasemapKey = %q", cfg.CartoBasemapKey)
+		}
+		if cfg.CartoBasemapURL != "https://tiles.example/{z}/{x}/{y}.png" {
+			t.Errorf("CartoBasemapURL = %q", cfg.CartoBasemapURL)
+		}
+		if cfg.CartoTileCacheTTL != 2*time.Hour {
+			t.Errorf(cartoTTLFormat, cfg.CartoTileCacheTTL)
+		}
+		if cfg.CartoTileCacheMaxEntries != 10 {
+			t.Errorf(cartoMaxFormat, cfg.CartoTileCacheMaxEntries)
+		}
+		if cfg.CartoTileRatePerMin != 5 {
+			t.Errorf(cartoRateFormat, cfg.CartoTileRatePerMin)
+		}
+	})
+
+	t.Run("nilai tidak valid memakai default", func(t *testing.T) {
+		setRequiredConfigEnv(t)
+		t.Setenv(envCartoBasemapKey, "")
+		t.Setenv(envCartoBasemapURL, "")
+		t.Setenv(envCartoTileCacheTTL, "bukan-durasi")
+		t.Setenv(envCartoTileCacheMaxEntries, "abc")
+		t.Setenv(envCartoTileRatePerMin, "xyz")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf(loadErrFormat, err)
+		}
+		if cfg.CartoTileCacheTTL != defaultCartoTileCacheTTL {
+			t.Errorf(cartoTTLFormat, cfg.CartoTileCacheTTL)
+		}
+		if cfg.CartoTileCacheMaxEntries != defaultCartoTileCacheMaxEntries {
+			t.Errorf(cartoMaxFormat, cfg.CartoTileCacheMaxEntries)
+		}
+		if cfg.CartoTileRatePerMin != defaultCartoTileRatePerMin {
+			t.Errorf(cartoRateFormat, cfg.CartoTileRatePerMin)
+		}
+	})
+}
+
 func TestLoad(t *testing.T) {
 	t.Run("konfigurasi lengkap", func(t *testing.T) {
 		t.Setenv(envDatabaseURL, "postgres://user:pass@localhost:5432/kicaugo")
-		t.Setenv(envJWTSecret, "rahasia-panjang")
+		t.Setenv(envJWTSecret, testJWTSecret)
 		t.Setenv(envPort, "9090")
 		t.Setenv(envDBMaxConns, "20")
 		t.Setenv(envDBMinConns, "5")
@@ -18,12 +116,12 @@ func TestLoad(t *testing.T) {
 
 		cfg, err := Load()
 		if err != nil {
-			t.Fatalf("Load() error = %v", err)
+			t.Fatalf(loadErrFormat, err)
 		}
 		if cfg.Port != "9090" {
 			t.Errorf("Port = %q, ingin 9090", cfg.Port)
 		}
-		if cfg.DatabaseURL == "" || cfg.JWTSecret != "rahasia-panjang" {
+		if cfg.DatabaseURL == "" || cfg.JWTSecret != testJWTSecret {
 			t.Errorf("konfigurasi tidak terbaca: %+v", cfg)
 		}
 		if cfg.TokenTTL != tokenTTL {
@@ -47,13 +145,13 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("port memakai default", func(t *testing.T) {
-		t.Setenv(envDatabaseURL, "postgres://localhost/kicaugo")
-		t.Setenv(envJWTSecret, "rahasia-panjang")
+		t.Setenv(envDatabaseURL, testDatabaseURL)
+		t.Setenv(envJWTSecret, testJWTSecret)
 		t.Setenv(envPort, "")
 
 		cfg, err := Load()
 		if err != nil {
-			t.Fatalf("Load() error = %v", err)
+			t.Fatalf(loadErrFormat, err)
 		}
 		if cfg.Port != defaultPort {
 			t.Errorf("Port = %q, ingin %q", cfg.Port, defaultPort)
@@ -68,7 +166,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("database url wajib", func(t *testing.T) {
 		t.Setenv(envDatabaseURL, "")
-		t.Setenv(envJWTSecret, "rahasia-panjang")
+		t.Setenv(envJWTSecret, testJWTSecret)
 
 		if _, err := Load(); err == nil {
 			t.Error("Load() ingin error saat DATABASE_URL kosong")
@@ -76,7 +174,7 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("jwt secret wajib", func(t *testing.T) {
-		t.Setenv(envDatabaseURL, "postgres://localhost/kicaugo")
+		t.Setenv(envDatabaseURL, testDatabaseURL)
 		t.Setenv(envJWTSecret, "")
 
 		if _, err := Load(); err == nil {
