@@ -27,7 +27,9 @@ services:
 
   api:
     image: ghcr.io/junx27/kicaugo-backend:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: kicaugo-api
     environment:
       PORT: ${PORT:-8080}
