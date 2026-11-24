@@ -26,9 +26,8 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/junx27/kicaugo-backend:latest
+    pull_policy: always
     container_name: kicaugo-api
     environment:
       PORT: ${PORT:-8080}
