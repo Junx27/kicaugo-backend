@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/testutil"
 )
 
 type mockRepository struct {
@@ -42,4 +43,14 @@ func TestRepositoryList(t *testing.T) {
 			t.Error("List() ingin error database")
 		}
 	})
+}
+
+func TestRepositoryListFromDatabase(t *testing.T) {
+	got, err := NewRepository(testutil.OpenDB(t)).List(context.Background())
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(got) == 0 {
+		t.Error("List() ingin mengembalikan seeder kategori burung")
+	}
 }
