@@ -1,3 +1,7 @@
+[![Quality Gate Passed](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+
+> **SonarCloud Quality Gate: Passed** — Security 0 issue · Duplication 0% · Reliability 0 bug · Maintainability 0 code smell
+
 # KicauGo Backend
 
 Backend pilot untuk integrasi Flutter `rumahkicau.mobile`. Tahap ini hanya mencakup
