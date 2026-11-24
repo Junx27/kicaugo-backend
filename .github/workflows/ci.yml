@@ -9,6 +9,7 @@ on:
 env:
   GO_VERSION: "1.27"
   DATABASE_URL: postgres://kicaugo@localhost:5432/kicaugo?sslmode=disable
+  TEST_DATABASE_URL: postgres://kicaugo@localhost:5432/kicaugo?sslmode=disable
   JWT_SECRET: ci-jwt-secret-min-32-chars-for-tests-only
   CARTO_BASEMAP_KEY: ""
   CARTO_BASEMAP_URL: https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
@@ -62,6 +63,12 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: Prepare test database
+        run: |
+          for file in internal/database/migrations/*.sql internal/database/indexes/*.sql internal/database/seeders/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
 
       - name: Test (race + coverage)
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
