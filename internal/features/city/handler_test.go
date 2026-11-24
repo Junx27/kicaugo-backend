@@ -62,12 +62,12 @@ func TestListCities(t *testing.T) {
 		svc := &fakeService{}
 		RegisterRoutes(api, svc)
 
-		resp := api.Get("/api/v1/cities?province_id=11&q=banda")
+		resp := api.Get("/api/v1/cities?province_id=11&name=banda")
 		if resp.Code != http.StatusOK {
 			t.Fatalf("status = %d, ingin 200", resp.Code)
 		}
 		if svc.query != "banda" {
-			t.Errorf("q = %q, ingin banda", svc.query)
+			t.Errorf("name = %q, ingin banda", svc.query)
 		}
 	})
 
