@@ -38,15 +38,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 
 // ResolveUserID menerjemahkan identifier dari token menjadi ID user.
 func (r *repository) ResolveUserID(ctx context.Context, identifier string) (int64, error) {
-	var id int64
-	err := r.db.QueryRow(ctx, `SELECT id FROM users WHERE identifier = $1`, identifier).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, apperrors.ErrNotFound
-	}
-	if err != nil {
-		return 0, fmt.Errorf("resolve user: %w", err)
-	}
-	return id, nil
+	return dbutil.ResolveUserID(ctx, r.db, identifier)
 }
 
 // EnsureAndGet membuat profil bila belum ada, lalu mengembalikannya beserta kota dan provinsi.

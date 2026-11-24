@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -36,15 +35,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 }
 
 func (r *repository) ResolveUserID(ctx context.Context, identifier string) (int64, error) {
-	var id int64
-	err := r.db.QueryRow(ctx, `SELECT id FROM users WHERE identifier = $1`, identifier).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, apperrors.ErrNotFound
-	}
-	if err != nil {
-		return 0, fmt.Errorf("resolve user: %w", err)
-	}
-	return id, nil
+	return dbutil.ResolveUserID(ctx, r.db, identifier)
 }
 
 func (r *repository) Create(ctx context.Context, in entities.Organizer) (entities.Organizer, error) {
