@@ -94,12 +94,12 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 	})
 
 	apphttp.Register(api, apphttp.Operation{
-		ID:       "createEvent",
-		Method:   http.MethodPost,
-		Path:     "/api/v1/events",
-		Summary:  "Create Event",
-		Tags:     []string{"event"},
-		Security: []map[string][]string{{"bearerAuth": {}}},
+		ID:          "createEvent",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/events",
+		Summary:     "Create Event",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
 		Middlewares: organizerAuth,
 	}, func(ctx context.Context, input *request.CreateEventInput) (*response.CreateEventOutput, error) {
 		identifier, err := authctx.IdentifierFromContext(ctx)
@@ -116,12 +116,12 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 	})
 
 	apphttp.Register(api, apphttp.Operation{
-		ID:       "startEventStreaming",
-		Method:   http.MethodPost,
-		Path:     "/api/v1/events/{id}/streamings/start",
-		Summary:  "Start Event Streaming",
-		Tags:     []string{"event"},
-		Security: []map[string][]string{{"bearerAuth": {}}},
+		ID:          "startEventStreaming",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/events/{id}/streamings/start",
+		Summary:     "Start Event Streaming",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
 		Middlewares: organizerAuth,
 	}, func(ctx context.Context, input *request.StartEventStreamingInput) (*response.StartEventStreamingOutput, error) {
 		identifier, err := authctx.IdentifierFromContext(ctx)
@@ -141,12 +141,12 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 	})
 
 	apphttp.Register(api, apphttp.Operation{
-		ID:       "updateEventStreamingJuara",
-		Method:   http.MethodPatch,
-		Path:     "/api/v1/events/{id}/streamings/juara",
-		Summary:  "Update Event Streaming Juara",
-		Tags:     []string{"event"},
-		Security: []map[string][]string{{"bearerAuth": {}}},
+		ID:          "updateEventStreamingJuara",
+		Method:      http.MethodPatch,
+		Path:        "/api/v1/events/{id}/streamings/juara",
+		Summary:     "Update Event Streaming Juara",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
 		Middlewares: organizerAuth,
 	}, func(ctx context.Context, input *request.UpdateEventStreamingJuaraInput) (*response.UpdateEventStreamingJuaraOutput, error) {
 		identifier, err := authctx.IdentifierFromContext(ctx)
@@ -166,12 +166,12 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 	})
 
 	apphttp.Register(api, apphttp.Operation{
-		ID:       "stopEventStreaming",
-		Method:   http.MethodPost,
-		Path:     "/api/v1/events/{id}/streamings/stop",
-		Summary:  "Stop Event Streaming",
-		Tags:     []string{"event"},
-		Security: []map[string][]string{{"bearerAuth": {}}},
+		ID:          "stopEventStreaming",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/events/{id}/streamings/stop",
+		Summary:     "Stop Event Streaming",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
 		Middlewares: organizerAuth,
 	}, func(ctx context.Context, input *request.StopEventStreamingInput) (*response.StopEventStreamingOutput, error) {
 		identifier, err := authctx.IdentifierFromContext(ctx)
