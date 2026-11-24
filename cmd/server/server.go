@@ -15,6 +15,7 @@ import (
 
 	"github.com/Junx27/kicaugo-backend/internal/config"
 	"github.com/Junx27/kicaugo-backend/internal/features/auth"
+	"github.com/Junx27/kicaugo-backend/internal/features/basemap"
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
 	"github.com/Junx27/kicaugo-backend/internal/features/city"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
@@ -23,6 +24,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/features/profile"
 	"github.com/Junx27/kicaugo-backend/internal/features/province"
 	"github.com/Junx27/kicaugo-backend/internal/features/weather"
+	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	// scaffold:imports
@@ -48,6 +50,7 @@ type Dependencies struct {
 	Home      home.Service
 	Organizer organizer.Service
 	Weather   weather.Service
+	Basemap   basemap.Service
 	// scaffold:deps
 	Auth           auth.AuthService
 	BirdCategories birdcategory.Service
@@ -68,6 +71,8 @@ func Run(ctx context.Context, deps Dependencies) error {
 	event.RegisterRoutes(api, deps.Event, deps.Tokens, deps.Organizer)
 	home.RegisterRoutes(api, deps.Home, deps.Tokens)
 	weather.RegisterRoutes(api, deps.Weather, deps.Tokens)
+	basemapLimiter := middlewares.NewRateLimiter(deps.Config.CartoTileRatePerMin)
+	basemap.RegisterRoutes(api, deps.Basemap, deps.Tokens, basemapLimiter.Middleware(api))
 	// scaffold:routes
 	router.Get("/health", healthHandler)
 

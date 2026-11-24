@@ -12,6 +12,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/config"
 	"github.com/Junx27/kicaugo-backend/internal/database"
 	"github.com/Junx27/kicaugo-backend/internal/features/auth"
+	"github.com/Junx27/kicaugo-backend/internal/features/basemap"
 	"github.com/Junx27/kicaugo-backend/internal/features/birdcategory"
 	"github.com/Junx27/kicaugo-backend/internal/features/city"
 	"github.com/Junx27/kicaugo-backend/internal/features/event"
@@ -52,6 +53,11 @@ func main() {
 	organizerService := organizer.NewService(organizer.NewRepository(pool))
 	homeService := home.NewService(profileService, eventService, birdCategoryService, organizerService)
 	weatherService := weather.NewService(weather.NewClient(cfg.WeatherAPIKey, cfg.WeatherAPIBase, cfg.WeatherAPILang))
+	basemapService := basemap.NewService(
+		basemap.NewClient(cfg.CartoBasemapKey, cfg.CartoBasemapURL),
+		cfg.CartoTileCacheTTL,
+		cfg.CartoTileCacheMaxEntries,
+	)
 	// scaffold:services
 	authService := auth.NewService(auth.NewRepository(pool), tokens)
 
@@ -66,6 +72,7 @@ func main() {
 		Home:           homeService,
 		Organizer:      organizerService,
 		Weather:        weatherService,
+		Basemap:        basemapService,
 		Auth:           authService,
 		BirdCategories: birdCategoryService,
 	}); err != nil {
