@@ -3,6 +3,8 @@ package http
 
 import (
 	"context"
+	"errors"
+	nethttp "net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -23,6 +25,7 @@ type Operation struct {
 	Tags        []string
 	Security    []map[string][]string
 	Middlewares []Middleware
+	Responses   map[string]*huma.Response
 }
 
 // Register mendaftarkan handler ke Huma API dengan konfigurasi Operation.
@@ -36,7 +39,20 @@ func Register[I, O any](api API, op Operation, handler func(context.Context, *I)
 		Tags:        op.Tags,
 		Security:    op.Security,
 		Middlewares: op.Middlewares,
+		Responses:   op.Responses,
 	}, handler)
+}
+
+// WriteError menulis error HTTP dengan format error API yang aktif.
+func WriteError(api API, ctx huma.Context, err error) {
+	status := nethttp.StatusInternalServerError
+	message := "Internal server error"
+	var statusErr huma.StatusError
+	if errors.As(err, &statusErr) {
+		status = statusErr.GetStatus()
+		message = statusErr.Error()
+	}
+	_ = huma.WriteErr(api, ctx, status, message)
 }
 
 // Error membuat error HTTP dengan status dan message tertentu.

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	nethttp "net/http"
 	"strings"
 	"testing"
@@ -61,6 +62,62 @@ func TestRegister(t *testing.T) {
 	}
 	if body.Message != "kicau" {
 		t.Errorf("message = %q, ingin kicau", body.Message)
+	}
+}
+
+func TestRegisterResponses(t *testing.T) {
+	_, api := humatest.New(t)
+	Register(api, Operation{
+		ID:     "image",
+		Method: nethttp.MethodGet,
+		Path:   "/image",
+		Responses: map[string]*huma.Response{
+			"200": {
+				Description: "PNG image",
+				Content: map[string]*huma.MediaType{
+					"image/png": {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+				},
+			},
+		},
+	}, func(context.Context, *struct{}) (*struct{}, error) {
+		return nil, nil
+	})
+
+	content := api.OpenAPI().Paths["/image"].Get.Responses["200"].Content
+	if content["image/png"] == nil {
+		t.Fatal("Responses image/png tidak diteruskan ke OpenAPI")
+	}
+}
+
+func TestWriteError(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		status  int
+		message string
+	}{
+		{name: "status error", err: Error(429, "too many requests"), status: nethttp.StatusTooManyRequests, message: "too many requests"},
+		{name: "error generik", err: errors.New("boom"), status: nethttp.StatusInternalServerError, message: "Internal server error"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, api := humatest.New(t)
+			api.UseMiddleware(func(ctx huma.Context, _ func(huma.Context)) {
+				WriteError(api, ctx, tc.err)
+			})
+			huma.Get(api, "/error", func(context.Context, *struct{}) (*struct{}, error) {
+				return nil, nil
+			})
+
+			resp := api.Get("/error")
+			if resp.Code != tc.status {
+				t.Errorf("status = %d, ingin %d", resp.Code, tc.status)
+			}
+			if !strings.Contains(resp.Body.String(), tc.message) {
+				t.Errorf("body = %q, ingin memuat %q", resp.Body.String(), tc.message)
+			}
+		})
 	}
 }
 
