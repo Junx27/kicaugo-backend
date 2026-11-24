@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.27"
+  DATABASE_URL: postgres://kicaugo:kicaugo@localhost:5432/kicaugo?sslmode=disable
+  JWT_SECRET: ci-jwt-secret-min-32-chars-for-tests-only
+  CARTO_BASEMAP_KEY: ""
+  CARTO_BASEMAP_URL: https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
+  CARTO_TILE_CACHE_TTL: 168h
+  CARTO_TILE_CACHE_MAX_ENTRIES: "20000"
+  CARTO_TILE_RATE_PER_MIN: "300"
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kicaugo
+          POSTGRES_PASSWORD: kicaugo
+          POSTGRES_DB: kicaugo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kicaugo -d kicaugo"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Files not formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (race + coverage)
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          if-no-files-found: ignore
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t kicaugo-backend:ci .
