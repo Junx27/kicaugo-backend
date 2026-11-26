@@ -14,8 +14,10 @@ type fakeRepository struct {
 	candidate          entities.OriginCandidate
 	originErr          error
 	events             []entities.Event
+	schedules          []entities.EventSchedule
 	listErr            error
 	ongoingCount       int
+	gantanganCount     int
 	countErr           error
 	originID           string
 	listOrigin         entities.NearbyOrigin
@@ -61,8 +63,16 @@ func (f *fakeRepository) ListNearby(ctx context.Context, origin entities.NearbyO
 	return f.events, f.listErr
 }
 
+func (f *fakeRepository) ListNearbySchedules(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
+	return f.schedules, f.listErr
+}
+
 func (f *fakeRepository) CountOngoing(ctx context.Context) (int, error) {
 	return f.ongoingCount, f.countErr
+}
+
+func (f *fakeRepository) CountGantangan(ctx context.Context) (int, error) {
+	return f.gantanganCount, f.countErr
 }
 
 func (f *fakeRepository) IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error) {

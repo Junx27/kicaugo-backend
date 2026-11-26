@@ -217,12 +217,17 @@ func newGetActiveTicketHandler(service Service) func(context.Context, *struct{})
 
 func newGetSchedulesHandler(service Service) func(context.Context, *struct{}) (*response.HomeSchedulesOutput, error) {
 	return func(ctx context.Context, _ *struct{}) (*response.HomeSchedulesOutput, error) {
-		if _, err := authctx.IdentifierFromContext(ctx); err != nil {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
 			return nil, err
+		}
+		schedules, err := service.GetSchedules(ctx, identifier)
+		if err != nil {
+			return nil, mapServiceError(err)
 		}
 		resp := &response.HomeSchedulesOutput{}
 		resp.Status = http.StatusOK
-		resp.Body = response.NewSuccess(http.StatusOK, "Home schedules loaded", toSchedulesData(service.GetSchedules()))
+		resp.Body = response.NewSuccess(http.StatusOK, "Home schedules loaded", toSchedulesData(schedules))
 		return resp, nil
 	}
 }

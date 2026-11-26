@@ -54,6 +54,10 @@ func (f *fakeService) CountOngoing(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
+func (f *fakeService) CountGantangan(ctx context.Context) (int, error) {
+	return 0, nil
+}
+
 func (f *fakeService) Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error) {
 	f.createIn = in
 	f.createID = identifier
@@ -87,6 +91,10 @@ func (f *fakeService) GetRandomFeatured(ctx context.Context, identifier string) 
 }
 
 func (f *fakeService) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
+	return nil, nil
+}
+
+func (f *fakeService) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
 	return nil, nil
 }
 

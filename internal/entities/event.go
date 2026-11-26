@@ -121,6 +121,20 @@ type UpcomingEvent struct {
 	RemainingTickets int
 }
 
+// EventSchedule adalah ringkasan jadwal (sub-event) pada event terdekat untuk halaman home.
+type EventSchedule struct {
+	ID           int64
+	EventID      int64
+	Title        string
+	Venue        string
+	Date         *time.Time
+	Price        int64
+	Status       string
+	CategoryID   *int64
+	CategoryName string
+	DistanceKM   float64
+}
+
 // FeaturedEvent adalah ringkasan event featured untuk halaman home.
 type FeaturedEvent struct {
 	ID         int64
