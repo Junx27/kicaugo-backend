@@ -54,4 +54,15 @@ func TestServiceListNearbySchedulesCoverage(t *testing.T) {
 			t.Fatal("ingin error")
 		}
 	})
+	t.Run("items nil", func(t *testing.T) {
+		repo := &fakeRepository{candidate: freshCandidate(), schedules: nil}
+		// override ListNearbySchedules to return nil,nil by using listErr nil and nil slice
+		got, err := NewService(repo).ListNearbySchedules(context.Background(), "user@example.com", 0, 0, 10)
+		if err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if got == nil {
+			t.Fatal("got nil, ingin empty slice")
+		}
+	})
 }
