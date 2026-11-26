@@ -1,7 +1,12 @@
 package event
 
 import (
+	"context"
 	"testing"
+
+	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/utils/format"
+	"github.com/Junx27/kicaugo-backend/internal/utils/request"
 )
 
 func TestToContestDetailDataBranchesCoverage(t *testing.T) {
@@ -82,4 +87,19 @@ func TestToContestDetailDataBranchesCoverage(t *testing.T) {
 		d.Classes[0].RemainingSlots = nil
 		_ = toContestDetailData(d)
 	})
+	t.Run("cheaper later class", func(t *testing.T) {
+		d := base
+		d.Classes = []entities.ContestClass{{Price: 300000}, {Price: 150000}}
+		out := toContestDetailData(d)
+		if out.Ticket.StartingPrice != format.Rupiah(150000) {
+			t.Fatalf("starting price = %s", out.Ticket.StartingPrice)
+		}
+	})
+}
+
+func TestGetContestDetailHandlerAuthErrorCoverage(t *testing.T) {
+	handler := newGetContestDetailHandler(&fakeService{})
+	if _, err := handler(context.Background(), &request.ContestDetailInput{ID: 1}); err == nil {
+		t.Fatal("ingin error")
+	}
 }

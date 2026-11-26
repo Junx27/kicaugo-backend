@@ -1,8 +1,50 @@
 package event
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 )
+
+type contestQueryResult struct {
+	rows *fakeRows
+	err  error
+}
+
+type contestQuerier struct {
+	fakeQuerier
+	results []contestQueryResult
+	calls   int
+}
+
+func (q *contestQuerier) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	if q.calls >= len(q.results) {
+		return &fakeRows{}, nil
+	}
+	result := q.results[q.calls]
+	q.calls++
+	if result.err != nil {
+		return nil, result.err
+	}
+	return result.rows, nil
+}
+
+func contestClassRows(maxSlots, active int) *fakeRows {
+	return &fakeRows{nextMax: 1, scanFunc: func(dest ...any) error {
+		*dest[0].(*int64) = 1
+		*dest[1].(*string) = "Class"
+		*dest[2].(**string) = nil
+		*dest[3].(**time.Time) = nil
+		*dest[4].(*int) = maxSlots
+		*dest[5].(*int) = active
+		*dest[6].(*int64) = 100000
+		*dest[7].(*string) = "Juara 1"
+		return nil
+	}}
+}
 
 func TestRepositoryGetContestDetailCoverage(t *testing.T) {
 	repo, ctx, conn := newTestRepository(t)
@@ -50,4 +92,81 @@ func TestRepositoryGetContestDetailNotFoundCoverage(t *testing.T) {
 	if _, err := repo.GetContestDetail(ctx, 999999); err == nil {
 		t.Fatal("ingin error")
 	}
+}
+
+func TestRepositoryGetContestDetailErrorBranchesCoverage(t *testing.T) {
+	ctx := context.Background()
+	dbErr := errors.New("db error")
+
+	t.Run("detail scan error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{fakeQuerier: fakeQuerier{rowErr: dbErr}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("class query error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{{err: dbErr}}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("class scan error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{{rows: &fakeRows{nextMax: 1, scanErr: dbErr}}}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("remaining slots clamped", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{
+			{rows: contestClassRows(0, 5)},
+			{rows: &fakeRows{}},
+		}}}
+		detail, err := repo.GetContestDetail(ctx, 1)
+		if err != nil {
+			t.Fatalf("GetContestDetail() error = %v", err)
+		}
+		if len(detail.Classes) != 1 || detail.Classes[0].RemainingSlots == nil || *detail.Classes[0].RemainingSlots != 0 {
+			t.Fatalf("classes = %+v", detail.Classes)
+		}
+	})
+
+	t.Run("class rows error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{{rows: &fakeRows{err: dbErr}}}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("rule query error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{
+			{rows: &fakeRows{}},
+			{err: dbErr},
+		}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("rule scan error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{
+			{rows: &fakeRows{}},
+			{rows: &fakeRows{nextMax: 1, scanErr: dbErr}},
+		}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
+
+	t.Run("rule rows error", func(t *testing.T) {
+		repo := &repository{db: &contestQuerier{results: []contestQueryResult{
+			{rows: &fakeRows{}},
+			{rows: &fakeRows{err: dbErr}},
+		}}}
+		if _, err := repo.GetContestDetail(ctx, 1); err == nil {
+			t.Fatal("ingin error")
+		}
+	})
 }
