@@ -1,11 +1,18 @@
-[![Quality Gate Passed](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
-
-> **SonarCloud Quality Gate: Passed** — Security 0 issue · Duplication 0% · Reliability 0 bug · Maintainability 0 code smell
-
 # KicauGo Backend
 
 Backend pilot untuk integrasi Flutter `rumahkicau.mobile`. Tahap ini hanya mencakup
 autentikasi; kontrak OpenAPI dihasilkan Huma di `/openapi.json`.
+
+## Status SonarCloud
+
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+[![Security](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+[![Reliability](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+[![Duplication](https://sonarcloud.io/api/project_badges/measure?project=Junx27_kicaugo-backend&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Junx27_kicaugo-backend)
+
+> **SonarCloud Quality Gate: Passed** — Security 0 issue · Duplication 0% · Reliability 0 bug · Maintainability 0 code smell
 
 ## Konfigurasi
 
