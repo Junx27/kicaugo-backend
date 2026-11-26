@@ -57,3 +57,31 @@ type ContestRule struct {
 	Severity    string
 	SortOrder   int
 }
+
+// Nilai severity aturan contest yang dikonsumsi klien.
+const (
+	RuleSeverityInfo    = "info"
+	RuleSeverityError   = "error"
+	RuleSeveritySuccess = "success"
+)
+
+// EventRuleInput adalah field aturan yang dipakai saat membuat dan memperbarui.
+type EventRuleInput struct {
+	Title       string
+	Description *string
+	Severity    string
+	SortOrder   int
+}
+
+// EventRuleCreate adalah input pembuatan aturan event.
+type EventRuleCreate struct {
+	EventID int64
+	EventRuleInput
+}
+
+// EventRuleUpdate adalah input pembaruan aturan event.
+type EventRuleUpdate struct {
+	EventID int64
+	RuleID  int64
+	EventRuleInput
+}

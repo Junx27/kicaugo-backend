@@ -151,6 +151,30 @@ type ContestDetailOutput struct {
 	Body   Success[ContestDetailData]
 }
 
+// ListEventRulesOutput adalah output GET /api/v1/events/{id}/rules.
+type ListEventRulesOutput struct {
+	Status int `status:"200"`
+	Body   Success[[]ContestRuleData]
+}
+
+// CreateEventRuleOutput adalah output POST /api/v1/events/{id}/rules.
+type CreateEventRuleOutput struct {
+	Status int `status:"201"`
+	Body   Success[ContestRuleData]
+}
+
+// UpdateEventRuleOutput adalah output PATCH /api/v1/events/{id}/rules/{ruleID}.
+type UpdateEventRuleOutput struct {
+	Status int `status:"200"`
+	Body   Success[ContestRuleData]
+}
+
+// DeleteEventRuleOutput adalah output DELETE /api/v1/events/{id}/rules/{ruleID}.
+type DeleteEventRuleOutput struct {
+	Status int `status:"200"`
+	Body   Success[struct{}]
+}
+
 // EventData adalah representasi event yang dibuat.
 type EventData struct {
 	ID                int64          `json:"id"`

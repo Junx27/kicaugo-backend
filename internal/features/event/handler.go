@@ -84,11 +84,7 @@ func toContestDetailData(detail entities.ContestDetail) response.ContestDetailDa
 	}
 	rules := make([]response.ContestRuleData, 0, len(detail.Rules))
 	for _, r := range detail.Rules {
-		rules = append(rules, response.ContestRuleData{
-			Title:       r.Title,
-			Description: r.Description,
-			Severity:    r.Severity,
-		})
+		rules = append(rules, toContestRuleData(r))
 	}
 	scheduleDate := ""
 	if detail.ScheduleDate != nil {
@@ -175,6 +171,28 @@ func toContestDetailData(detail entities.ContestDetail) response.ContestDetailDa
 	}
 }
 
+// toContestRuleData memetakan aturan ke response; deskripsi null dikirim sebagai string kosong.
+func toContestRuleData(rule entities.ContestRule) response.ContestRuleData {
+	description := ""
+	if rule.Description != nil {
+		description = *rule.Description
+	}
+	return response.ContestRuleData{
+		Title:       rule.Title,
+		Description: &description,
+		Severity:    rule.Severity,
+	}
+}
+
+func toEventRuleInput(body request.EventRuleBody) entities.EventRuleInput {
+	return entities.EventRuleInput{
+		Title:       body.Title,
+		Description: body.Description,
+		Severity:    body.Severity,
+		SortOrder:   body.SortOrder,
+	}
+}
+
 func newGetContestDetailHandler(service Service) func(context.Context, *request.ContestDetailInput) (*response.ContestDetailOutput, error) {
 	return func(ctx context.Context, input *request.ContestDetailInput) (*response.ContestDetailOutput, error) {
 		identifier, err := authctx.IdentifierFromContext(ctx)
@@ -189,6 +207,73 @@ func newGetContestDetailHandler(service Service) func(context.Context, *request.
 		resp := &response.ContestDetailOutput{}
 		resp.Status = http.StatusOK
 		resp.Body = response.NewSuccess(http.StatusOK, "Detail lomba berhasil dimuat", toContestDetailData(detail))
+		return resp, nil
+	}
+}
+
+func newListEventRulesHandler(service Service) func(context.Context, *request.ListEventRulesInput) (*response.ListEventRulesOutput, error) {
+	return func(ctx context.Context, input *request.ListEventRulesInput) (*response.ListEventRulesOutput, error) {
+		rules, err := service.ListEventRules(ctx, input.ID)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		data := make([]response.ContestRuleData, 0, len(rules))
+		for _, rule := range rules {
+			data = append(data, toContestRuleData(rule))
+		}
+		resp := &response.ListEventRulesOutput{Status: http.StatusOK}
+		resp.Body = response.NewSuccess(http.StatusOK, "Event rules loaded", data)
+		return resp, nil
+	}
+}
+
+func newCreateEventRuleHandler(service Service) func(context.Context, *request.CreateEventRuleInput) (*response.CreateEventRuleOutput, error) {
+	return func(ctx context.Context, input *request.CreateEventRuleInput) (*response.CreateEventRuleOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		rule, err := service.CreateEventRule(ctx, identifier, entities.EventRuleCreate{
+			EventID: input.ID, EventRuleInput: toEventRuleInput(input.Body),
+		})
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.CreateEventRuleOutput{Status: http.StatusCreated}
+		resp.Body = response.NewSuccess(http.StatusCreated, "Event rule created", toContestRuleData(rule))
+		return resp, nil
+	}
+}
+
+func newUpdateEventRuleHandler(service Service) func(context.Context, *request.UpdateEventRuleInput) (*response.UpdateEventRuleOutput, error) {
+	return func(ctx context.Context, input *request.UpdateEventRuleInput) (*response.UpdateEventRuleOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		rule, err := service.UpdateEventRule(ctx, identifier, entities.EventRuleUpdate{
+			EventID: input.ID, RuleID: input.RuleID, EventRuleInput: toEventRuleInput(input.Body),
+		})
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.UpdateEventRuleOutput{Status: http.StatusOK}
+		resp.Body = response.NewSuccess(http.StatusOK, "Event rule updated", toContestRuleData(rule))
+		return resp, nil
+	}
+}
+
+func newDeleteEventRuleHandler(service Service) func(context.Context, *request.DeleteEventRuleInput) (*response.DeleteEventRuleOutput, error) {
+	return func(ctx context.Context, input *request.DeleteEventRuleInput) (*response.DeleteEventRuleOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := service.DeleteEventRule(ctx, identifier, input.ID, input.RuleID); err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.DeleteEventRuleOutput{Status: http.StatusOK}
+		resp.Body = response.NewSuccess(http.StatusOK, "Event rule deleted", struct{}{})
 		return resp, nil
 	}
 }
@@ -330,6 +415,46 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 		Security:    []map[string][]string{{"bearerAuth": {}}},
 		Middlewares: []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)},
 	}, newGetContestDetailHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "listEventRules",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/events/{id}/rules",
+		Summary:     "List Event Rules",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)},
+	}, newListEventRulesHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "createEventRule",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/events/{id}/rules",
+		Summary:     "Create Event Rule",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: organizerAuth,
+	}, newCreateEventRuleHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "updateEventRule",
+		Method:      http.MethodPatch,
+		Path:        "/api/v1/events/{id}/rules/{ruleID}",
+		Summary:     "Update Event Rule",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: organizerAuth,
+	}, newUpdateEventRuleHandler(service))
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "deleteEventRule",
+		Method:      http.MethodDelete,
+		Path:        "/api/v1/events/{id}/rules/{ruleID}",
+		Summary:     "Delete Event Rule",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: organizerAuth,
+	}, newDeleteEventRuleHandler(service))
 }
 
 func toCreateEntity(input *request.CreateEventInput) entities.EventCreate {

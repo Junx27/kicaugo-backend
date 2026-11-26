@@ -21,6 +21,9 @@ type fakeRepository struct {
 	countErr           error
 	contestDetail      entities.ContestDetail
 	contestErr         error
+	rule               entities.ContestRule
+	rules              []entities.ContestRule
+	ruleErr            error
 	originID           string
 	listOrigin         entities.NearbyOrigin
 	listRadius         int
@@ -123,6 +126,22 @@ func (f *fakeRepository) GetRandomUpcoming(ctx context.Context) (*entities.Upcom
 
 func (f *fakeRepository) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
 	return f.contestDetail, f.contestErr
+}
+
+func (f *fakeRepository) ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error) {
+	return f.rules, f.ruleErr
+}
+
+func (f *fakeRepository) CreateEventRule(ctx context.Context, in entities.EventRuleCreate) (entities.ContestRule, error) {
+	return f.rule, f.ruleErr
+}
+
+func (f *fakeRepository) UpdateEventRule(ctx context.Context, in entities.EventRuleUpdate) (entities.ContestRule, error) {
+	return f.rule, f.ruleErr
+}
+
+func (f *fakeRepository) DeleteEventRule(ctx context.Context, eventID, ruleID int64) error {
+	return f.ruleErr
 }
 
 func freshCandidate() entities.OriginCandidate {

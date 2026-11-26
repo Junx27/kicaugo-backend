@@ -8,9 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type fakeRow struct{ err error }
+type fakeRow struct {
+	err   error
+	pgErr error
+}
 
-func (r fakeRow) Scan(dest ...any) error { return r.err }
+func (r fakeRow) Scan(dest ...any) error {
+	if r.pgErr != nil {
+		return r.pgErr
+	}
+	return r.err
+}
 
 func (fakeRow) Close() {}
 
@@ -57,10 +65,12 @@ type fakeQuerier struct {
 	queryErr error
 	rows     *fakeRows
 	rowErr   error
+	rowPgErr error
+	execErr  error
 }
 
 func (f fakeQuerier) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
+	return pgconn.CommandTag{}, f.execErr
 }
 
 func (f fakeQuerier) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
@@ -71,7 +81,7 @@ func (f fakeQuerier) Query(ctx context.Context, sql string, args ...any) (pgx.Ro
 }
 
 func (f fakeQuerier) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	return fakeRow{err: f.rowErr}
+	return fakeRow{err: f.rowErr, pgErr: f.rowPgErr}
 }
 
 func (f fakeQuerier) Begin(ctx context.Context) (pgx.Tx, error) {
