@@ -41,6 +41,8 @@ type fakeService struct {
 	stopErr           error
 	stopEventID       int64
 	stopID            string
+	contestDetail     entities.ContestDetail
+	contestErr        error
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -92,6 +94,13 @@ func (f *fakeService) GetRandomFeatured(ctx context.Context, identifier string) 
 
 func (f *fakeService) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
 	return nil, nil
+}
+
+func (f *fakeService) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	if f.contestErr != nil {
+		return entities.ContestDetail{}, f.contestErr
+	}
+	return f.contestDetail, nil
 }
 
 func (f *fakeService) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {

@@ -18,6 +18,7 @@ type fakeRows struct {
 	nextCount int
 	nextMax   int
 	scanErr   error
+	scanFunc  func(dest ...any) error
 	err       error
 }
 
@@ -39,7 +40,12 @@ func (r *fakeRows) Next() bool {
 	return false
 }
 
-func (r *fakeRows) Scan(dest ...any) error { return r.scanErr }
+func (r *fakeRows) Scan(dest ...any) error {
+	if r.scanFunc != nil {
+		return r.scanFunc(dest...)
+	}
+	return r.scanErr
+}
 
 func (r *fakeRows) RawValues() [][]byte { return nil }
 

@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	"github.com/Junx27/kicaugo-backend/internal/utils/authctx"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
+	"github.com/Junx27/kicaugo-backend/internal/utils/format"
 	apphttp "github.com/Junx27/kicaugo-backend/internal/utils/http"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	"github.com/Junx27/kicaugo-backend/internal/utils/request"
@@ -57,6 +59,138 @@ func toEventData(e entities.Event) response.NearbyEventData {
 		data.EndDate = &value
 	}
 	return data
+}
+
+func toContestDetailData(detail entities.ContestDetail) response.ContestDetailData {
+	remaining := detail.TotalSlots - detail.ActiveTickets
+	if remaining < 0 {
+		remaining = 0
+	}
+	classes := make([]response.ContestClassData, 0, len(detail.Classes))
+	for _, c := range detail.Classes {
+		timeText := ""
+		if c.StartTime != nil {
+			timeText = c.StartTime.Format("15:04") + " WIB"
+		}
+		classes = append(classes, response.ContestClassData{
+			ID:             c.ID,
+			Name:           c.Name,
+			Session:        c.Session,
+			Time:           timeText,
+			RemainingSlots: c.RemainingSlots,
+			Price:          format.Rupiah(c.Price),
+			PrizeHighlight: c.PrizeHighlight,
+		})
+	}
+	rules := make([]response.ContestRuleData, 0, len(detail.Rules))
+	for _, r := range detail.Rules {
+		rules = append(rules, response.ContestRuleData{
+			Title:       r.Title,
+			Description: r.Description,
+			Severity:    r.Severity,
+		})
+	}
+	scheduleDate := ""
+	if detail.ScheduleDate != nil {
+		scheduleDate = formatIndonesianDate(*detail.ScheduleDate)
+	}
+	prizeTotal := "-"
+	if detail.PrizePool != nil && *detail.PrizePool != "" {
+		prizeTotal = format.RupiahString(*detail.PrizePool)
+	}
+	// starting price
+	startingPrice := "Rp 0"
+	if len(detail.Classes) > 0 {
+		min := detail.Classes[0].Price
+		for _, c := range detail.Classes[1:] {
+			if c.Price < min {
+				min = c.Price
+			}
+		}
+		if min == 0 {
+			startingPrice = "Gratis"
+		} else {
+			startingPrice = format.Rupiah(min)
+		}
+	}
+	status := detail.Status
+	if status == "published" || status == "ongoing" {
+		status = "open"
+	}
+	address := ""
+	if detail.Address != nil {
+		address = *detail.Address
+	}
+	hero := detail.HeroImageURL
+	banner := detail.BannerImageURL
+	mapImage := detail.MapImageURL
+	return response.ContestDetailData{
+		ID:             detail.ID,
+		Title:          detail.Title,
+		Subtitle:       detail.Subtitle,
+		OfficialBadge:  detail.OfficialBadge,
+		FormatBadge:    detail.FormatBadge,
+		EditionLabel:   detail.EditionLabel,
+		HeroImageURL:   hero,
+		BannerImageURL: banner,
+		Status:         status,
+		Quota: response.ContestQuotaData{
+			Total:     detail.TotalSlots,
+			Remaining: remaining,
+			Label:     "Kuota Tersedia",
+		},
+		Schedule: response.ContestScheduleData{
+			Date:     scheduleDate,
+			Time:     detail.ScheduleTime,
+			GateOpen: detail.GateOpen,
+		},
+		Location: response.ContestLocationData{
+			Name:        detail.Venue,
+			Address:     address,
+			Distance:    detail.DistanceText,
+			MapImageURL: mapImage,
+			Latitude:    detail.Latitude,
+			Longitude:   detail.Longitude,
+			Parking:     detail.Parking,
+		},
+		Prize: response.ContestPrizeData{
+			Total:     prizeTotal,
+			Trophy:    detail.PrizeTrophy,
+			Highlight: detail.PrizeHighlight,
+		},
+		Stats: response.ContestStatsData{
+			Format:     response.ContestStatItemData{Label: detail.StatFormatLabel, Note: detail.StatFormatNote},
+			Judging:    response.ContestStatItemData{Label: detail.StatJudgingLabel, Note: detail.StatJudgingNote},
+			Facilities: response.ContestStatItemData{Label: detail.StatFacilitiesLabel, Note: detail.StatFacilitiesNote},
+		},
+		Classes: classes,
+		Rules:   rules,
+		Ticket: response.ContestTicketData{
+			StartingPrice: startingPrice,
+			Unit:          "/gantangan",
+			CTA:           "Beli Tiket",
+		},
+		Distance:     detail.DistanceText,
+		ScheduleText: scheduleDate,
+	}
+}
+
+func newGetContestDetailHandler(service Service) func(context.Context, *request.ContestDetailInput) (*response.ContestDetailOutput, error) {
+	return func(ctx context.Context, input *request.ContestDetailInput) (*response.ContestDetailOutput, error) {
+		identifier, err := authctx.IdentifierFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		_ = identifier
+		detail, err := service.GetContestDetail(ctx, input.ID)
+		if err != nil {
+			return nil, mapServiceError(err)
+		}
+		resp := &response.ContestDetailOutput{}
+		resp.Status = http.StatusOK
+		resp.Body = response.NewSuccess(http.StatusOK, "Detail lomba berhasil dimuat", toContestDetailData(detail))
+		return resp, nil
+	}
 }
 
 // RegisterRoutes mendaftarkan route event ke Huma API.
@@ -186,6 +320,16 @@ func RegisterRoutes(api apphttp.API, service Service, tokens *jwt.Manager, organ
 		resp.Body = response.NewSuccess(http.StatusOK, "Event streaming stopped", toStreamingData(stopped))
 		return resp, nil
 	})
+
+	apphttp.Register(api, apphttp.Operation{
+		ID:          "getContestDetail",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/contests/{id}",
+		Summary:     "Get Contest Detail",
+		Tags:        []string{"event"},
+		Security:    []map[string][]string{{"bearerAuth": {}}},
+		Middlewares: []apphttp.Middleware{middlewares.AuthMiddleware[jwt.Claims](tokens)},
+	}, newGetContestDetailHandler(service))
 }
 
 func toCreateEntity(input *request.CreateEventInput) entities.EventCreate {
@@ -278,4 +422,11 @@ func mapServiceError(err error) error {
 	default:
 		return apphttp.InternalServerError("An error occurred. Please try again.")
 	}
+}
+
+// formatIndonesianDate memformat tanggal ke bentuk Indonesia, contoh: Minggu, 18 Mei 2025.
+func formatIndonesianDate(t time.Time) string {
+	days := []string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
+	months := []string{"Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"}
+	return fmt.Sprintf("%s, %d %s %d", days[t.Weekday()], t.Day(), months[int(t.Month())-1], t.Year())
 }

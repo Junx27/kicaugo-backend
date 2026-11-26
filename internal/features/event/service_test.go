@@ -19,6 +19,8 @@ type fakeRepository struct {
 	ongoingCount       int
 	gantanganCount     int
 	countErr           error
+	contestDetail      entities.ContestDetail
+	contestErr         error
 	originID           string
 	listOrigin         entities.NearbyOrigin
 	listRadius         int
@@ -117,6 +119,10 @@ func (f *fakeRepository) GetRandomFeatured(ctx context.Context, identifier strin
 
 func (f *fakeRepository) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
 	return f.randomUpcoming, f.randomUpcomingErr
+}
+
+func (f *fakeRepository) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	return f.contestDetail, f.contestErr
 }
 
 func freshCandidate() entities.OriginCandidate {

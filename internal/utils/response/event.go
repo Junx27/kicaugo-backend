@@ -52,6 +52,105 @@ type SubEventData struct {
 	SortOrder      int     `json:"sort_order"`
 }
 
+// ContestQuotaData adalah kuota contest.
+type ContestQuotaData struct {
+	Total     int    `json:"total"`
+	Remaining int    `json:"remaining"`
+	Label     string `json:"label"`
+}
+
+// ContestScheduleData adalah jadwal contest.
+type ContestScheduleData struct {
+	Date     string `json:"date"`
+	Time     string `json:"time"`
+	GateOpen string `json:"gate_open"`
+}
+
+// ContestLocationData adalah lokasi contest.
+type ContestLocationData struct {
+	Name        string   `json:"name"`
+	Address     string   `json:"address"`
+	Distance    string   `json:"distance"`
+	MapImageURL *string  `json:"map_image_url"`
+	Latitude    *float64 `json:"latitude"`
+	Longitude   *float64 `json:"longitude"`
+	Parking     string   `json:"parking"`
+}
+
+// ContestPrizeData adalah hadiah contest.
+type ContestPrizeData struct {
+	Total     string `json:"total"`
+	Trophy    string `json:"trophy"`
+	Highlight string `json:"highlight"`
+}
+
+// ContestStatItemData adalah item statistik contest.
+type ContestStatItemData struct {
+	Label string `json:"label"`
+	Note  string `json:"note"`
+}
+
+// ContestStatsData adalah statistik contest.
+type ContestStatsData struct {
+	Format     ContestStatItemData `json:"format"`
+	Judging    ContestStatItemData `json:"judging"`
+	Facilities ContestStatItemData `json:"facilities"`
+}
+
+// ContestClassData adalah kelas contest.
+type ContestClassData struct {
+	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
+	Session        *string `json:"session"`
+	Time           string  `json:"time"`
+	RemainingSlots *int    `json:"remaining_slots"`
+	Price          string  `json:"price"`
+	PrizeHighlight string  `json:"prize_highlight"`
+}
+
+// ContestRuleData adalah aturan contest.
+type ContestRuleData struct {
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Severity    string  `json:"severity"`
+}
+
+// ContestTicketData adalah info tiket contest.
+type ContestTicketData struct {
+	StartingPrice string `json:"starting_price"`
+	Unit          string `json:"unit"`
+	CTA           string `json:"cta"`
+}
+
+// ContestDetailData adalah response detail contest.
+type ContestDetailData struct {
+	ID             int64               `json:"id"`
+	Title          string              `json:"title"`
+	Subtitle       string              `json:"subtitle"`
+	OfficialBadge  string              `json:"official_badge"`
+	FormatBadge    string              `json:"format_badge"`
+	EditionLabel   string              `json:"edition_label"`
+	HeroImageURL   *string             `json:"hero_image_url"`
+	BannerImageURL *string             `json:"banner_image_url"`
+	Status         string              `json:"status"`
+	Quota          ContestQuotaData    `json:"quota"`
+	Schedule       ContestScheduleData `json:"schedule"`
+	Location       ContestLocationData `json:"location"`
+	Prize          ContestPrizeData    `json:"prize"`
+	Stats          ContestStatsData    `json:"stats"`
+	Classes        []ContestClassData  `json:"classes"`
+	Rules          []ContestRuleData   `json:"rules"`
+	Ticket         ContestTicketData   `json:"ticket"`
+	Distance       string              `json:"distance"`
+	ScheduleText   string              `json:"schedule_text"`
+}
+
+// ContestDetailOutput adalah output GET /api/v1/contests/{id}.
+type ContestDetailOutput struct {
+	Status int `status:"200"`
+	Body   Success[ContestDetailData]
+}
+
 // EventData adalah representasi event yang dibuat.
 type EventData struct {
 	ID                int64          `json:"id"`
