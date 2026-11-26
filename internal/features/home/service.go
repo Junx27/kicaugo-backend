@@ -28,7 +28,9 @@ type ProfileReader interface {
 // EventReader adalah bagian event.Service yang dipakai home.
 type EventReader interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (event.NearbyResult, error)
+	ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error)
 	CountOngoing(ctx context.Context) (int, error)
+	CountGantangan(ctx context.Context) (int, error)
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 	GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error)
 	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
@@ -131,7 +133,7 @@ type Service interface {
 	GetUpcoming(ctx context.Context) (Upcoming, error)
 	GetStats() Stats
 	GetActiveTicket() ActiveTicket
-	GetSchedules() []Schedule
+	GetSchedules(ctx context.Context, identifier string) ([]Schedule, error)
 	GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error)
 }
 
@@ -143,6 +145,8 @@ type service struct {
 	organizers     OrganizerReader
 	now            func() time.Time
 }
+
+const defaultScheduleLimit = 20
 
 // NewService membuat service dengan dependency home yang sudah ada.
 func NewService(profiles ProfileReader, events EventReader, birdCategories BirdCategoryReader, organizers OrganizerReader) Service {
@@ -218,15 +222,28 @@ func (s *service) GetUpcoming(ctx context.Context) (Upcoming, error) {
 }
 
 func (s *service) GetStats() Stats {
-	return demoStats()
+	stats := defaultStats()
+	count, err := s.events.CountGantangan(context.Background())
+	if err == nil && count >= 0 {
+		stats.Headline = fmt.Sprintf("%d+ Gantangan", count)
+	}
+	return stats
 }
 
 func (s *service) GetActiveTicket() ActiveTicket {
 	return demoActiveTicket()
 }
 
-func (s *service) GetSchedules() []Schedule {
-	return demoSchedules()
+func (s *service) GetSchedules(ctx context.Context, identifier string) ([]Schedule, error) {
+	items, err := s.events.ListNearbySchedules(ctx, identifier, 0, 0, defaultScheduleLimit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Schedule, 0, len(items))
+	for _, item := range items {
+		out = append(out, scheduleFromEventSchedule(item))
+	}
+	return out, nil
 }
 
 func (s *service) GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error) {
@@ -318,7 +335,7 @@ func upcomingFromEvent(ev entities.UpcomingEvent) Upcoming {
 	return Upcoming{Type: "Upcoming Event", Title: ev.Title, Time: timeText, Price: price, RemainingTickets: ev.RemainingTickets}
 }
 
-func demoStats() Stats {
+func defaultStats() Stats {
 	return Stats{
 		Badge:        "100% Resmi",
 		Headline:     "520+ Gantangan",
@@ -341,51 +358,31 @@ func demoActiveTicket() ActiveTicket {
 	}
 }
 
-func demoSchedules() []Schedule {
-	return []Schedule{
-		{
-			Title:  "Latpres Exclusive Cucak Ijo",
-			Venue:  "Arena Master Cilandak, Jaksel",
-			Date:   "Selasa, 24 Nov",
-			Price:  "Rp 100rb",
-			Status: "available",
-			Category: ScheduleCategory{
-				ID:   1,
-				Name: "Cucak Hijau",
-			},
-		},
-		{
-			Title:  "Festival Kicau Batavia",
-			Venue:  "Gantangan Taman Mini, Jaktim",
-			Date:   "Kamis, 26 Nov",
-			Price:  "Rp 150rb",
-			Status: "almost_gone",
-			Category: ScheduleCategory{
-				ID:   2,
-				Name: "Murai Batu",
-			},
-		},
-		{
-			Title:  "Latber Kacer Mingguan",
-			Venue:  "Lapangan Kicau Pesanggrahan, Jaksel",
-			Date:   "Sabtu, 28 Nov",
-			Price:  "Rp 60rb",
-			Status: "sold_out",
-			Category: ScheduleCategory{
-				ID:   3,
-				Name: "Kacer",
-			},
-		},
-		{
-			Title:  "Kenari Cup Kemang",
-			Venue:  "Kemang Bird Park, Jaksel",
-			Date:   "Minggu, 29 Nov",
-			Price:  "Rp 85rb",
-			Status: "waiting",
-			Category: ScheduleCategory{
-				ID:   4,
-				Name: "Kenari",
-			},
-		},
+// scheduleFromEventSchedule memetakan EventSchedule dari database ke data jadwal home.
+func scheduleFromEventSchedule(item entities.EventSchedule) Schedule {
+	date := "-"
+	if item.Date != nil {
+		date = item.Date.Format("Monday, 02 Jan")
+	}
+	price := "Gratis"
+	if item.Price > 0 {
+		price = format.Rupiah(item.Price)
+	}
+	category := ScheduleCategory{}
+	if item.CategoryID != nil {
+		category.ID = *item.CategoryID
+	}
+	if item.CategoryName != "" {
+		category.Name = item.CategoryName
+	} else {
+		category.Name = "-"
+	}
+	return Schedule{
+		Title:    item.Title,
+		Venue:    item.Venue,
+		Date:     date,
+		Price:    price,
+		Status:   item.Status,
+		Category: category,
 	}
 }

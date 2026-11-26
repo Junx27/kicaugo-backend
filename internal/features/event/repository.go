@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -21,7 +22,9 @@ const uniqueViolation = "23505"
 type Repository interface {
 	Origin(ctx context.Context, identifier string) (entities.OriginCandidate, error)
 	ListNearby(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.Event, error)
+	ListNearbySchedules(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error)
 	CountOngoing(ctx context.Context) (int, error)
+	CountGantangan(ctx context.Context) (int, error)
 	IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error)
 	Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error)
 	EventByID(ctx context.Context, eventID int64) (entities.Event, error)
@@ -83,6 +86,16 @@ func (r *repository) CountOngoing(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// CountGantangan menjumlahkan total gantangan dari semua event terdaftar.
+func (r *repository) CountGantangan(ctx context.Context) (int, error) {
+	const query = `SELECT COALESCE(SUM(total_slots), 0) FROM events`
+	var count int
+	if err := r.db.QueryRow(ctx, query).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count gantangan: %w", err)
+	}
+	return count, nil
+}
+
 // nearbyQuery menghitung jarak Haversine dalam satu helper SQL terparameterisasi.
 // Koordinat venue diambil dari events, lalu jatuh ke pusat kota bila kosong.
 const nearbyQuery = `WITH origin AS (
@@ -140,6 +153,79 @@ func (r *repository) ListNearby(ctx context.Context, origin entities.NearbyOrigi
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate nearby events: %w", err)
+	}
+	return out, nil
+}
+
+// nearbySchedulesQuery mengambil sub-event (jadwal) pada event terdekat.
+const nearbySchedulesQuery = `WITH origin AS (
+		SELECT $1::double precision AS lat, $2::double precision AS lng
+	), candidates AS (
+		SELECT e.id AS event_id, e.venue, e.city,
+			COALESCE(e.latitude, c.latitude) AS event_lat,
+			COALESCE(e.longitude, c.longitude) AS event_lng,
+			se.id AS schedule_id, se.title, se.price, se.status, se.start_time,
+			e.start_date, se.bird_category_id, bc.name AS category_name
+		FROM events e
+		JOIN sub_events se ON se.event_id = e.id
+		LEFT JOIN cities c ON c.id = e.city_id
+		LEFT JOIN bird_categories bc ON bc.id = se.bird_category_id
+		WHERE e.status IN ('published', 'ongoing')
+		  AND (e.end_date IS NULL OR e.end_date >= CURRENT_DATE)
+		  AND ($5::bigint = 0 OR se.bird_category_id = $5::bigint)
+	), distances AS (
+		SELECT cand.*, 6371.0088 * 2 * asin(LEAST(1, GREATEST(-1, sqrt(
+			power(sin(radians(cand.event_lat - o.lat) / 2), 2) +
+			cos(radians(o.lat)) * cos(radians(cand.event_lat)) *
+			power(sin(radians(cand.event_lng - o.lng) / 2), 2)
+		)))) AS distance_km
+		FROM candidates cand
+		CROSS JOIN origin o
+		WHERE cand.event_lat IS NOT NULL AND cand.event_lng IS NOT NULL
+	)
+	SELECT schedule_id, event_id, title, venue, price, status, start_time, start_date, bird_category_id, category_name, distance_km
+	FROM distances
+	WHERE distance_km <= $3::double precision
+	ORDER BY distance_km, schedule_id
+	LIMIT $4::int`
+
+// ListNearbySchedules mengambil jadwal (sub-event) pada event aktif dalam radius tertentu.
+func (r *repository) ListNearbySchedules(ctx context.Context, origin entities.NearbyOrigin, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
+	rows, err := r.db.Query(ctx, nearbySchedulesQuery, origin.Latitude, origin.Longitude, radiusKM, limit, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("list nearby schedules: %w", err)
+	}
+	defer rows.Close()
+
+	var out []entities.EventSchedule
+	for rows.Next() {
+		var item entities.EventSchedule
+		var startTime *time.Time
+		var startDate *time.Time
+		var categoryIDVal *int64
+		var categoryName *string
+		if err := rows.Scan(
+			&item.ID, &item.EventID, &item.Title, &item.Venue, &item.Price, &item.Status,
+			&startTime, &startDate, &categoryIDVal, &categoryName, &item.DistanceKM,
+		); err != nil {
+			return nil, fmt.Errorf("scan nearby schedule: %w", err)
+		}
+		if startTime != nil {
+			item.Date = startTime
+		} else {
+			item.Date = startDate
+		}
+		item.CategoryID = categoryIDVal
+		if categoryName != nil {
+			item.CategoryName = *categoryName
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate nearby schedules: %w", err)
+	}
+	if out == nil {
+		out = []entities.EventSchedule{}
 	}
 	return out, nil
 }

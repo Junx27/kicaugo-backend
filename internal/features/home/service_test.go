@@ -27,12 +27,16 @@ type fakeEventReader struct {
 	err             error
 	count           int
 	countErr        error
+	gantanganCount  int
+	gantanganErr    error
 	activeStreaming *entities.ActiveEventStreaming
 	activeErr       error
 	featured        *entities.FeaturedEvent
 	featuredErr     error
 	upcoming        *entities.UpcomingEvent
 	upcomingErr     error
+	nearbySchedules []entities.EventSchedule
+	nearbySchedErr  error
 	identifier      string
 	opts            Options
 }
@@ -47,6 +51,13 @@ func (f *fakeEventReader) CountOngoing(ctx context.Context) (int, error) {
 	return f.count, f.countErr
 }
 
+func (f *fakeEventReader) CountGantangan(ctx context.Context) (int, error) {
+	if f.gantanganErr != nil {
+		return 0, f.gantanganErr
+	}
+	return f.gantanganCount, nil
+}
+
 func (f *fakeEventReader) GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error) {
 	return f.activeStreaming, f.activeErr
 }
@@ -57,6 +68,12 @@ func (f *fakeEventReader) GetRandomFeatured(ctx context.Context, identifier stri
 
 func (f *fakeEventReader) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
 	return f.upcoming, f.upcomingErr
+}
+
+func (f *fakeEventReader) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
+	f.identifier = identifier
+	f.opts = Options{RadiusKM: radiusKM, CategoryID: categoryID, Limit: limit}
+	return f.nearbySchedules, f.nearbySchedErr
 }
 
 type fakeBirdCategoryReader struct {
@@ -197,9 +214,18 @@ func TestServiceDummySections(t *testing.T) {
 		t.Errorf("active ticket = %+v", ticket)
 	}
 
-	schedules := svc.GetSchedules()
-	if len(schedules) != 4 {
-		t.Fatalf("len(schedules) = %d, ingin 4", len(schedules))
+	categoryID := int64(1)
+	eventSchedules := []entities.EventSchedule{{
+		ID: 1, EventID: 2, Title: "Latpres Exclusive Cucak Ijo", Venue: "Arena Master Cilandak, Jaksel",
+		Price: 100000, Status: "available", CategoryID: &categoryID, CategoryName: "Cucak Hijau",
+	}}
+	svc = NewService(&fakeProfileReader{}, &fakeEventReader{nearbySchedules: eventSchedules}, &fakeBirdCategoryReader{}, &fakeOrganizerReader{})
+	schedules, err := svc.GetSchedules(context.Background(), "user@example.com")
+	if err != nil {
+		t.Fatalf("GetSchedules() error = %v", err)
+	}
+	if len(schedules) != 1 {
+		t.Fatalf("len(schedules) = %d, ingin 1", len(schedules))
 	}
 	if schedules[0].Status != "available" || schedules[0].Category.Name != "Cucak Hijau" {
 		t.Errorf("schedule[0] = %+v", schedules[0])

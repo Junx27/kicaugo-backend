@@ -21,7 +21,9 @@ type NearbyResult struct {
 // Service berisi aturan event.
 type Service interface {
 	ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error)
+	ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error)
 	CountOngoing(ctx context.Context) (int, error)
+	CountGantangan(ctx context.Context) (int, error)
 	Create(ctx context.Context, identifier string, in entities.EventCreate) (entities.EventDetail, error)
 	StartStreaming(ctx context.Context, identifier string, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
 	UpdateStreamingJuara(ctx context.Context, identifier string, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
@@ -45,6 +47,11 @@ func NewService(repo Repository) Service {
 // CountOngoing meneruskan penghitungan event yang sedang berlangsung ke repository.
 func (s *service) CountOngoing(ctx context.Context) (int, error) {
 	return s.repo.CountOngoing(ctx)
+}
+
+// CountGantangan meneruskan penjumlahan gantangan seluruh event ke repository.
+func (s *service) CountGantangan(ctx context.Context) (int, error) {
+	return s.repo.CountGantangan(ctx)
 }
 
 // Create membuat event beserta sub-event untuk organizer aktif.
@@ -257,4 +264,31 @@ func (s *service) ListNearby(ctx context.Context, identifier string, radiusKM in
 	}
 	result.Events = events
 	return result, nil
+}
+
+// ListNearbySchedules menentukan asal pencarian, lalu mengambil jadwal pada event terdekat.
+func (s *service) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
+	candidate, err := s.repo.Origin(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	radius := effectiveRadius(radiusKM, candidate.RadiusKM)
+	if radius < 1 || radius > maxRadiusKM {
+		return nil, apperrors.ErrInvalidRadius
+	}
+	if limit < 1 || limit > maxLimit {
+		return nil, apperrors.ErrInvalidPayload
+	}
+	origin, _ := resolveOrigin(candidate, s.now())
+	if origin == nil {
+		return []entities.EventSchedule{}, nil
+	}
+	items, err := s.repo.ListNearbySchedules(ctx, *origin, radius, categoryID, limit)
+	if err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = []entities.EventSchedule{}
+	}
+	return items, nil
 }

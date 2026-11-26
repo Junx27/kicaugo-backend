@@ -29,6 +29,7 @@ type fakeService struct {
 	stats          Stats
 	activeTicket   ActiveTicket
 	schedules      []Schedule
+	scheduleErr    error
 	birdCategories []entities.BirdCategory
 	birdErr        error
 }
@@ -45,7 +46,13 @@ func (f *fakeService) GetFeatured(ctx context.Context, identifier string) (Featu
 func (f *fakeService) GetUpcoming(ctx context.Context) (Upcoming, error) { return f.upcoming, f.err }
 func (f *fakeService) GetStats() Stats                                   { return f.stats }
 func (f *fakeService) GetActiveTicket() ActiveTicket                     { return f.activeTicket }
-func (f *fakeService) GetSchedules() []Schedule                          { return f.schedules }
+func (f *fakeService) GetSchedules(ctx context.Context, identifier string) ([]Schedule, error) {
+	f.identifier = identifier
+	if f.scheduleErr != nil {
+		return f.schedules, f.scheduleErr
+	}
+	return f.schedules, f.err
+}
 func (f *fakeService) GetBirdCategories(ctx context.Context) ([]entities.BirdCategory, error) {
 	return f.birdCategories, f.birdErr
 }
