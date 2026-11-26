@@ -28,6 +28,7 @@ type Repository interface {
 	IsActiveOrganizerMember(ctx context.Context, identifier string, organizerID int64) (bool, error)
 	Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error)
 	EventByID(ctx context.Context, eventID int64) (entities.Event, error)
+	GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error)
 	HasActiveStreaming(ctx context.Context, eventID int64) (bool, error)
 	CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
 	UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
@@ -352,6 +353,86 @@ func (r *repository) EventByID(ctx context.Context, eventID int64) (entities.Eve
 	}
 	if err != nil {
 		return entities.Event{}, fmt.Errorf("get event by id: %w", err)
+	}
+	return out, nil
+}
+
+// GetContestDetail mengambil detail lomba beserta kelas dan aturan.
+func (r *repository) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	const query = `SELECT id, title, COALESCE(subtitle, ''), COALESCE(official_badge, ''),
+		COALESCE(format_badge, ''), COALESCE(edition_label, ''), hero_image_url, banner_url,
+		status, total_slots,
+		(SELECT COUNT(*) FROM event_tickets WHERE event_id = $1 AND status = 'active') AS active_tickets,
+		start_date, COALESCE(schedule_time, ''), COALESCE(gate_open, ''),
+		venue, address, COALESCE(distance_text, ''), map_image_url, latitude, longitude,
+		COALESCE(parking, ''), prize_pool, COALESCE(prize_trophy, ''), COALESCE(prize_highlight, ''),
+		COALESCE(stat_format_label, ''), COALESCE(stat_format_note, ''),
+		COALESCE(stat_judging_label, ''), COALESCE(stat_judging_note, ''),
+		COALESCE(stat_facilities_label, ''), COALESCE(stat_facilities_note, '')
+		FROM events WHERE id = $1`
+	var out entities.ContestDetail
+	err := r.db.QueryRow(ctx, query, eventID).Scan(
+		&out.ID, &out.Title, &out.Subtitle, &out.OfficialBadge, &out.FormatBadge, &out.EditionLabel,
+		&out.HeroImageURL, &out.BannerImageURL, &out.Status, &out.TotalSlots, &out.ActiveTickets,
+		&out.ScheduleDate, &out.ScheduleTime, &out.GateOpen, &out.Venue, &out.Address, &out.DistanceText,
+		&out.MapImageURL, &out.Latitude, &out.Longitude, &out.Parking, &out.PrizePool, &out.PrizeTrophy,
+		&out.PrizeHighlight, &out.StatFormatLabel, &out.StatFormatNote, &out.StatJudgingLabel, &out.StatJudgingNote,
+		&out.StatFacilitiesLabel, &out.StatFacilitiesNote,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entities.ContestDetail{}, apperrors.ErrNotFound
+	}
+	if err != nil {
+		return entities.ContestDetail{}, fmt.Errorf("get contest detail: %w", err)
+	}
+
+	classRows, err := r.db.Query(ctx, `SELECT se.id, se.title, se.session, se.start_time, se.max_slots,
+		(SELECT COUNT(*) FROM event_tickets et WHERE et.sub_event_id = se.id AND et.status = 'active') AS active_tickets,
+		se.price, COALESCE(se.prize_highlight, '')
+		FROM sub_events se WHERE se.event_id = $1 ORDER BY se.sort_order, se.id`, eventID)
+	if err != nil {
+		return entities.ContestDetail{}, fmt.Errorf("list contest classes: %w", err)
+	}
+	defer classRows.Close()
+	for classRows.Next() {
+		var c entities.ContestClass
+		var maxSlots, active int
+		if err := classRows.Scan(&c.ID, &c.Name, &c.Session, &c.StartTime, &maxSlots, &active, &c.Price, &c.PrizeHighlight); err != nil {
+			return entities.ContestDetail{}, fmt.Errorf("scan contest class: %w", err)
+		}
+		remaining := maxSlots - active
+		if remaining < 0 {
+			remaining = 0
+		}
+		remainingPtr := remaining
+		c.RemainingSlots = &remainingPtr
+		out.Classes = append(out.Classes, c)
+	}
+	if err := classRows.Err(); err != nil {
+		return entities.ContestDetail{}, fmt.Errorf("iterate contest classes: %w", err)
+	}
+	if out.Classes == nil {
+		out.Classes = []entities.ContestClass{}
+	}
+
+	ruleRows, err := r.db.Query(ctx, `SELECT id, title, description, severity, sort_order
+		FROM contest_rules WHERE event_id = $1 ORDER BY sort_order, id`, eventID)
+	if err != nil {
+		return entities.ContestDetail{}, fmt.Errorf("list contest rules: %w", err)
+	}
+	defer ruleRows.Close()
+	for ruleRows.Next() {
+		var rule entities.ContestRule
+		if err := ruleRows.Scan(&rule.ID, &rule.Title, &rule.Description, &rule.Severity, &rule.SortOrder); err != nil {
+			return entities.ContestDetail{}, fmt.Errorf("scan contest rule: %w", err)
+		}
+		out.Rules = append(out.Rules, rule)
+	}
+	if err := ruleRows.Err(); err != nil {
+		return entities.ContestDetail{}, fmt.Errorf("iterate contest rules: %w", err)
+	}
+	if out.Rules == nil {
+		out.Rules = []entities.ContestRule{}
 	}
 	return out, nil
 }

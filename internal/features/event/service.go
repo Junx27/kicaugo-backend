@@ -31,6 +31,7 @@ type Service interface {
 	GetActiveStreaming(ctx context.Context) (*entities.ActiveEventStreaming, error)
 	GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error)
 	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
+	GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error)
 }
 
 // service adalah implementasi Service.
@@ -151,6 +152,14 @@ func (s *service) GetRandomFeatured(ctx context.Context, identifier string) (*en
 // GetRandomUpcoming mengambil satu event acak yang belum release untuk home upcoming.
 func (s *service) GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error) {
 	return s.repo.GetRandomUpcoming(ctx)
+}
+
+// GetContestDetail mengambil detail lomba berdasarkan ID.
+func (s *service) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	if eventID <= 0 {
+		return entities.ContestDetail{}, apperrors.ErrInvalidPayload
+	}
+	return s.repo.GetContestDetail(ctx, eventID)
 }
 
 func validateCreateInput(in entities.EventCreate) error {

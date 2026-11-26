@@ -29,6 +29,11 @@ type CreateSubEventInput struct {
 	SortOrder      int        `json:"sort_order,omitempty" minimum:"0" doc:"Urutan tampil"`
 }
 
+// ContestDetailInput adalah input GET /api/v1/contests/{id}.
+type ContestDetailInput struct {
+	ID int64 `path:"id" minimum:"1" doc:"ID contest"`
+}
+
 // CreateEventInput adalah input POST /api/v1/events.
 type CreateEventInput struct {
 	Body struct {

@@ -94,6 +94,10 @@ func (f *fakeService) GetRandomUpcoming(ctx context.Context) (*entities.Upcoming
 	return nil, nil
 }
 
+func (f *fakeService) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	return entities.ContestDetail{}, nil
+}
+
 func (f *fakeService) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
 	return nil, nil
 }

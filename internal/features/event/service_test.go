@@ -119,6 +119,10 @@ func (f *fakeRepository) GetRandomUpcoming(ctx context.Context) (*entities.Upcom
 	return f.randomUpcoming, f.randomUpcomingErr
 }
 
+func (f *fakeRepository) GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error) {
+	return entities.ContestDetail{}, nil
+}
+
 func freshCandidate() entities.OriginCandidate {
 	now := time.Now()
 	return entities.OriginCandidate{
