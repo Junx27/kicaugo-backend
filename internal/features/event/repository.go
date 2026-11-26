@@ -16,7 +16,12 @@ import (
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 )
 
-const uniqueViolation = "23505"
+const (
+	uniqueViolation     = "23505"
+	foreignKeyViolation = "23503"
+	checkViolation      = "23514"
+	eventRuleOp         = "event rule"
+)
 
 // Repository menyediakan operasi event.
 type Repository interface {
@@ -29,6 +34,10 @@ type Repository interface {
 	Create(ctx context.Context, in entities.EventCreate) (entities.EventDetail, error)
 	EventByID(ctx context.Context, eventID int64) (entities.Event, error)
 	GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error)
+	ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error)
+	CreateEventRule(ctx context.Context, in entities.EventRuleCreate) (entities.ContestRule, error)
+	UpdateEventRule(ctx context.Context, in entities.EventRuleUpdate) (entities.ContestRule, error)
+	DeleteEventRule(ctx context.Context, eventID, ruleID int64) error
 	HasActiveStreaming(ctx context.Context, eventID int64) (bool, error)
 	CreateStreaming(ctx context.Context, in entities.StartEventStreamingInput) (entities.EventStreaming, error)
 	UpdateStreamingJuara(ctx context.Context, in entities.UpdateEventStreamingJuaraInput) (entities.EventStreaming, error)
@@ -435,6 +444,85 @@ func (r *repository) GetContestDetail(ctx context.Context, eventID int64) (entit
 		out.Rules = []entities.ContestRule{}
 	}
 	return out, nil
+}
+
+// ListEventRules mengambil seluruh aturan sebuah event sesuai urutan tampil.
+func (r *repository) ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error) {
+	const query = `SELECT id, title, description, severity, sort_order
+		FROM contest_rules WHERE event_id = $1 ORDER BY sort_order, id`
+	rows, err := r.db.Query(ctx, query, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list %s: %w", eventRuleOp, err)
+	}
+	defer rows.Close()
+
+	out := make([]entities.ContestRule, 0)
+	for rows.Next() {
+		var rule entities.ContestRule
+		if err := rows.Scan(&rule.ID, &rule.Title, &rule.Description, &rule.Severity, &rule.SortOrder); err != nil {
+			return nil, fmt.Errorf("scan %s: %w", eventRuleOp, err)
+		}
+		out = append(out, rule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate %s: %w", eventRuleOp, err)
+	}
+	return out, nil
+}
+
+// CreateEventRule menyimpan satu aturan untuk event.
+func (r *repository) CreateEventRule(ctx context.Context, in entities.EventRuleCreate) (entities.ContestRule, error) {
+	const query = `INSERT INTO contest_rules (event_id, title, description, severity, sort_order)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id, title, description, severity, sort_order`
+	var out entities.ContestRule
+	err := r.db.QueryRow(ctx, query, in.EventID, in.Title, in.Description, in.Severity, in.SortOrder).
+		Scan(&out.ID, &out.Title, &out.Description, &out.Severity, &out.SortOrder)
+	if err != nil {
+		return entities.ContestRule{}, mapEventRuleError(err, "create")
+	}
+	return out, nil
+}
+
+// UpdateEventRule memperbarui aturan yang dimiliki event.
+func (r *repository) UpdateEventRule(ctx context.Context, in entities.EventRuleUpdate) (entities.ContestRule, error) {
+	const query = `UPDATE contest_rules SET title = $1, description = $2, severity = $3, sort_order = $4, updated_at = now()
+		WHERE event_id = $5 AND id = $6 RETURNING id, title, description, severity, sort_order`
+	var out entities.ContestRule
+	err := r.db.QueryRow(ctx, query, in.Title, in.Description, in.Severity, in.SortOrder, in.EventID, in.RuleID).
+		Scan(&out.ID, &out.Title, &out.Description, &out.Severity, &out.SortOrder)
+	if err != nil {
+		return entities.ContestRule{}, mapEventRuleError(err, "update")
+	}
+	return out, nil
+}
+
+// DeleteEventRule menghapus aturan yang dimiliki event.
+func (r *repository) DeleteEventRule(ctx context.Context, eventID, ruleID int64) error {
+	const query = `DELETE FROM contest_rules WHERE event_id = $1 AND id = $2`
+	tag, err := r.db.Exec(ctx, query, eventID, ruleID)
+	if err != nil {
+		return fmt.Errorf("delete %s: %w", eventRuleOp, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperrors.ErrNotFound
+	}
+	return nil
+}
+
+func mapEventRuleError(err error, operation string) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperrors.ErrNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == foreignKeyViolation {
+			return apperrors.ErrNotFound
+		}
+		if pgErr.Code == checkViolation {
+			return apperrors.ErrInvalidPayload
+		}
+	}
+	return fmt.Errorf("%s %s: %w", operation, eventRuleOp, err)
 }
 
 // HasActiveStreaming memeriksa apakah event memiliki streaming yang masih aktif.

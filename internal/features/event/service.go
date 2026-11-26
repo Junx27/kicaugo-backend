@@ -32,6 +32,10 @@ type Service interface {
 	GetRandomFeatured(ctx context.Context, identifier string) (*entities.FeaturedEvent, error)
 	GetRandomUpcoming(ctx context.Context) (*entities.UpcomingEvent, error)
 	GetContestDetail(ctx context.Context, eventID int64) (entities.ContestDetail, error)
+	ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error)
+	CreateEventRule(ctx context.Context, identifier string, in entities.EventRuleCreate) (entities.ContestRule, error)
+	UpdateEventRule(ctx context.Context, identifier string, in entities.EventRuleUpdate) (entities.ContestRule, error)
+	DeleteEventRule(ctx context.Context, identifier string, eventID, ruleID int64) error
 }
 
 // service adalah implementasi Service.
@@ -160,6 +164,107 @@ func (s *service) GetContestDetail(ctx context.Context, eventID int64) (entities
 		return entities.ContestDetail{}, apperrors.ErrInvalidPayload
 	}
 	return s.repo.GetContestDetail(ctx, eventID)
+}
+
+// ListEventRules mengambil aturan event setelah memvalidasi ID.
+func (s *service) ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error) {
+	if err := validateEventRuleIDs(eventID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListEventRules(ctx, eventID)
+}
+
+// CreateEventRule menyimpan aturan baru untuk event milik organizer aktif.
+func (s *service) CreateEventRule(ctx context.Context, identifier string, in entities.EventRuleCreate) (entities.ContestRule, error) {
+	if err := validateEventRuleIDs(in.EventID); err != nil {
+		return entities.ContestRule{}, err
+	}
+	if err := validateEventRuleInput(in.EventRuleInput); err != nil {
+		return entities.ContestRule{}, err
+	}
+	if err := s.authorizeRuleWriter(ctx, identifier, in.EventID); err != nil {
+		return entities.ContestRule{}, err
+	}
+	return s.repo.CreateEventRule(ctx, in)
+}
+
+// UpdateEventRule memperbarui aturan event milik organizer aktif.
+func (s *service) UpdateEventRule(ctx context.Context, identifier string, in entities.EventRuleUpdate) (entities.ContestRule, error) {
+	if err := validateEventRuleIDs(in.EventID, in.RuleID); err != nil {
+		return entities.ContestRule{}, err
+	}
+	if err := validateEventRuleInput(in.EventRuleInput); err != nil {
+		return entities.ContestRule{}, err
+	}
+	if err := s.authorizeRuleWriter(ctx, identifier, in.EventID); err != nil {
+		return entities.ContestRule{}, err
+	}
+	return s.repo.UpdateEventRule(ctx, in)
+}
+
+// DeleteEventRule menghapus aturan event milik organizer aktif.
+func (s *service) DeleteEventRule(ctx context.Context, identifier string, eventID, ruleID int64) error {
+	if err := validateEventRuleIDs(eventID, ruleID); err != nil {
+		return err
+	}
+	if err := s.authorizeRuleWriter(ctx, identifier, eventID); err != nil {
+		return err
+	}
+	return s.repo.DeleteEventRule(ctx, eventID, ruleID)
+}
+
+func validateEventRuleIDs(eventID int64, ruleIDs ...int64) error {
+	if eventID <= 0 {
+		return apperrors.ErrInvalidPayload
+	}
+	for _, id := range ruleIDs {
+		if id <= 0 {
+			return apperrors.ErrInvalidPayload
+		}
+	}
+	return nil
+}
+
+func validateEventRuleInput(in entities.EventRuleInput) error {
+	title := strings.TrimSpace(in.Title)
+	if title == "" || len(title) < 3 || len(title) > 150 {
+		return apperrors.ErrInvalidPayload
+	}
+	if in.Description != nil && len(*in.Description) > 1000 {
+		return apperrors.ErrInvalidPayload
+	}
+	if !isRuleSeverity(in.Severity) || in.SortOrder < 0 {
+		return apperrors.ErrInvalidPayload
+	}
+	return nil
+}
+
+func isRuleSeverity(value string) bool {
+	switch value {
+	case entities.RuleSeverityInfo, entities.RuleSeverityError, entities.RuleSeveritySuccess:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *service) authorizeRuleWriter(ctx context.Context, identifier string, eventID int64) error {
+	ev, err := s.repo.EventByID(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	return s.ensureOrganizerMember(ctx, identifier, ev.OrganizerID)
+}
+
+func (s *service) ensureOrganizerMember(ctx context.Context, identifier string, organizerID int64) error {
+	active, err := s.repo.IsActiveOrganizerMember(ctx, identifier, organizerID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return apperrors.ErrForbidden
+	}
+	return nil
 }
 
 func validateCreateInput(in entities.EventCreate) error {

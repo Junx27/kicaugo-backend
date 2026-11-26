@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/humatest"
 
 	"github.com/Junx27/kicaugo-backend/internal/entities"
+	"github.com/Junx27/kicaugo-backend/internal/middlewares"
 	apperrors "github.com/Junx27/kicaugo-backend/internal/utils/errors"
 	"github.com/Junx27/kicaugo-backend/internal/utils/jwt"
 	"github.com/Junx27/kicaugo-backend/internal/utils/response"
@@ -43,6 +44,12 @@ type fakeService struct {
 	stopID            string
 	contestDetail     entities.ContestDetail
 	contestErr        error
+	rule              entities.ContestRule
+	rules             []entities.ContestRule
+	ruleErr           error
+	ruleIn            entities.EventRuleCreate
+	ruleUpdateIn      entities.EventRuleUpdate
+	deleteRuleIDs     [2]int64
 }
 
 func (f *fakeService) ListNearby(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) (NearbyResult, error) {
@@ -103,6 +110,25 @@ func (f *fakeService) GetContestDetail(ctx context.Context, eventID int64) (enti
 	return f.contestDetail, nil
 }
 
+func (f *fakeService) ListEventRules(ctx context.Context, eventID int64) ([]entities.ContestRule, error) {
+	return f.rules, f.ruleErr
+}
+
+func (f *fakeService) CreateEventRule(ctx context.Context, identifier string, in entities.EventRuleCreate) (entities.ContestRule, error) {
+	f.ruleIn = in
+	return f.rule, f.ruleErr
+}
+
+func (f *fakeService) UpdateEventRule(ctx context.Context, identifier string, in entities.EventRuleUpdate) (entities.ContestRule, error) {
+	f.ruleUpdateIn = in
+	return f.rule, f.ruleErr
+}
+
+func (f *fakeService) DeleteEventRule(ctx context.Context, identifier string, eventID, ruleID int64) error {
+	f.deleteRuleIDs = [2]int64{eventID, ruleID}
+	return f.ruleErr
+}
+
 func (f *fakeService) ListNearbySchedules(ctx context.Context, identifier string, radiusKM int, categoryID int64, limit int) ([]entities.EventSchedule, error) {
 	return nil, nil
 }
@@ -131,9 +157,14 @@ func (f fakeOrganizerChecker) HasActiveMembership(ctx context.Context, identifie
 
 func setupHandler(t *testing.T, svc Service) (humatest.TestAPI, *jwt.Manager) {
 	t.Helper()
+	return setupHandlerWithOrganizer(t, svc, fakeOrganizerChecker{active: true})
+}
+
+func setupHandlerWithOrganizer(t *testing.T, svc Service, checker middlewares.OrganizerChecker) (humatest.TestAPI, *jwt.Manager) {
+	t.Helper()
 	_, api := humatest.New(t)
 	tokens := newTestTokens()
-	RegisterRoutes(api, svc, tokens, fakeOrganizerChecker{active: true})
+	RegisterRoutes(api, svc, tokens, checker)
 	return api, tokens
 }
 

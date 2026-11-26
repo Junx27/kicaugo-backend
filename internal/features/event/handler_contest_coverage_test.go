@@ -78,8 +78,8 @@ func TestToContestDetailDataBranchesCoverage(t *testing.T) {
 		d := base
 		d.Rules[0].Description = nil
 		out := toContestDetailData(d)
-		if out.Rules[0].Description != nil {
-			t.Fatal("description not nil")
+		if out.Rules[0].Description == nil || *out.Rules[0].Description != "" {
+			t.Fatalf("description = %v", out.Rules[0].Description)
 		}
 	})
 	t.Run("nil remaining slots", func(t *testing.T) {

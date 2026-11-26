@@ -34,6 +34,38 @@ type ContestDetailInput struct {
 	ID int64 `path:"id" minimum:"1" doc:"ID contest"`
 }
 
+// EventRuleBody adalah field aturan event yang dipakai saat tulis.
+type EventRuleBody struct {
+	Title       string  `json:"title" required:"true" minLength:"3" maxLength:"150" doc:"Judul aturan"`
+	Description *string `json:"description,omitempty" maxLength:"1000" doc:"Deskripsi aturan"`
+	Severity    string  `json:"severity" required:"true" enum:"info,error,success" doc:"Tingkat keparahan aturan"`
+	SortOrder   int     `json:"sort_order,omitempty" minimum:"0" doc:"Urutan tampil aturan"`
+}
+
+// ListEventRulesInput adalah input GET /api/v1/events/{id}/rules.
+type ListEventRulesInput struct {
+	ID int64 `path:"id" minimum:"1" doc:"ID event"`
+}
+
+// CreateEventRuleInput adalah input POST /api/v1/events/{id}/rules.
+type CreateEventRuleInput struct {
+	ID   int64         `path:"id" minimum:"1" doc:"ID event"`
+	Body EventRuleBody `doc:"Aturan event"`
+}
+
+// UpdateEventRuleInput adalah input PATCH /api/v1/events/{id}/rules/{ruleID}.
+type UpdateEventRuleInput struct {
+	ID     int64         `path:"id" minimum:"1" doc:"ID event"`
+	RuleID int64         `path:"ruleID" minimum:"1" doc:"ID aturan"`
+	Body   EventRuleBody `doc:"Aturan event"`
+}
+
+// DeleteEventRuleInput adalah input DELETE /api/v1/events/{id}/rules/{ruleID}.
+type DeleteEventRuleInput struct {
+	ID     int64 `path:"id" minimum:"1" doc:"ID event"`
+	RuleID int64 `path:"ruleID" minimum:"1" doc:"ID aturan"`
+}
+
 // CreateEventInput adalah input POST /api/v1/events.
 type CreateEventInput struct {
 	Body struct {
